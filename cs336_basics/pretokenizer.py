@@ -98,10 +98,7 @@ def pretokenize(
     
         counters = list(tqdm(it, total=len(boundaries) - 1))
                             
-    counter = sum(counters, Counter())
-    counter = {tuple(k.encode("utf-8")): v for k, v in counter.items()}
-
-    return counter
+    return sum(counters, Counter())
 
 
 if __name__ == "__main__":

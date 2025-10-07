@@ -36,37 +36,45 @@ def tokenizer(
 
 
 def _tokenizer_inner(
-        pretoken_counter: dict[tuple[int], int], 
+        pretoken_counter: Counter, 
         vocab_size: int, 
         special_tokens: list[str]
     ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
 
     # Initialize vocabulary and merges
-    vocab = {i: token.encode("utf-8") for i, token in enumerate(special_tokens)} | {i + len(special_tokens): bytes([i]) for i in range(256)}
+    token_list = [token.encode("utf-8") for token in special_tokens] + [bytes([i]) for i in range(256)]
+    vocab = dict(enumerate(token_list))
     merges = []
     num_iters = vocab_size - len(vocab)
     assert num_iters >= 0
 
+    # Prepare pretokens using the vocabulary
+    shift = len(special_tokens)
+    pretokens = [(tuple(c + shift for c in seq.encode("utf-8")), cnt) for seq, cnt in pretoken_counter.items()]
+
     # Count pairs
     pair_counter = Counter()
-    pretokens = list(pretoken_counter.items())
     
     for pretoken, factor in pretokens:
         counter = Counter(pretoken[i: i+2] for i in range(len(pretoken) - 1))
         counter = Counter({k: v * factor for k, v in counter.items()})
         pair_counter.update(counter)
     
+    # Merge greedily
     for _ in range(num_iters):
-        # Find the most frequent pair
-        pair = max(pair_counter.items(), key=lambda kv: (kv[1], kv[0]))[0]
-        new_token_ind = len(vocab)
+        # Find the most frequent pair using the lexicographic order of the original byte sequences to resolve ties
+        max_count = max(pair_counter.values())
+        candidates = [p for p, c in pair_counter.items() if c == max_count]
+        pair = max(candidates, key=lambda p: (vocab[p[0]], vocab[p[1]]))
         
         # Update pretokens
+        new_token_ind = len(vocab)
+
         for pt_ind, (pretoken, ptk_cnt) in enumerate(pretokens):
             new_pretoken = []
             i = 0
-            while i < len(pretoken) - 1:
-                if (pretoken[i], pretoken[i + 1]) == pair:
+            while i < len(pretoken):
+                if i < len(pretoken) - 1 and (pretoken[i], pretoken[i + 1]) == pair:
                     # Update the previous pair
                     if i > 0:
                         last_token = new_pretoken[-1]

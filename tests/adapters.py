@@ -9,7 +9,8 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
-from ..cs336_basics.tokenizer import tokenizer
+from cs336_basics.tokenizer import tokenizer
+
 
 def run_linear(
     d_in: int,
