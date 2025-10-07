@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run tokenizer as module",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "cs336_basics.tokenizer",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true
+    }
+  ]
+}
+
