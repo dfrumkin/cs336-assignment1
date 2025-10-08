@@ -7,6 +7,7 @@ from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
 
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+NUM_PROCESSES = min(32, os.cpu_count() or 1)
 
 
 def find_chunk_boundaries(
@@ -61,7 +62,7 @@ def process_chunk(
     input_path: str | os.PathLike,
     start: int,
     end: int,
-    pattern: bytes,
+    pattern: str,
 ) -> Counter:
     with open(input_path, "rb") as f: 
         f.seek(start)
@@ -75,8 +76,8 @@ def process_chunk(
 
 def pretokenize(   
     input_path: str | os.PathLike,
-    num_processes: int, 
     special_tokens: list[str],
+    num_processes: int = NUM_PROCESSES, 
 ) -> Counter:
 
     byte_pattern = b"|".join(re.escape(token.encode("utf-8")) for token in special_tokens)
@@ -104,13 +105,12 @@ def pretokenize(
 if __name__ == "__main__":
     import pickle
 
-    # INPUT_PATH = "data/TinyStoriesV2-GPT4-valid.txt"
-    INPUT_PATH = "data/TinyStoriesV2-GPT4-train.txt"
+    INPUT_PATH = "data/TinyStoriesV2-GPT4-valid.txt"
+    # INPUT_PATH = "data/TinyStoriesV2-GPT4-train.txt"
     OUTPUT_PATH = "data/pretokens.pkl"
     SPECIAL_TOKEN = "<|endoftext|>"
-    NUM_PROCESSES = min(32, os.cpu_count())
 
-    counter = pretokenize(INPUT_PATH, NUM_PROCESSES, [SPECIAL_TOKEN])
+    counter = pretokenize(INPUT_PATH, [SPECIAL_TOKEN])
     print("Number of pre-tokens:", len(counter))
 
     print(f"Saving to {OUTPUT_PATH}")

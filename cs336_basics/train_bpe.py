@@ -1,8 +1,6 @@
 import os
 from collections import Counter
-from .pretokenizer import pretokenize
-
-NUM_PROCESSES = min(32, os.cpu_count())
+from cs336_basics.pretokenizer import pretokenize
 
 
 def tokenizer(
@@ -10,28 +8,7 @@ def tokenizer(
     vocab_size: int,
     special_tokens: list[str],
 ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
-    """Given the path to an input corpus, run train a BPE tokenizer and
-    output its vocabulary and merges.
-
-    Args:
-        input_path (str | os.PathLike): Path to BPE tokenizer training data.
-        vocab_size (int): Total number of items in the tokenizer's vocabulary (including special tokens).
-        special_tokens (list[str]): A list of string special tokens to be added to the tokenizer vocabulary.
-            These strings will never be split into multiple tokens, and will always be
-            kept as a single token. If these special tokens occur in the `input_path`,
-            they are treated as any other string.
-
-    Returns:
-        tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
-            vocab:
-                The trained tokenizer vocabulary, a mapping from int (token ID in the vocabulary)
-                to bytes (token bytes)
-            merges:
-                BPE merges. Each list item is a tuple of bytes (<token1>, <token2>),
-                representing that <token1> was merged with <token2>.
-                Merges are ordered by order of creation.
-    """
-    pretoken_counter = pretokenize(input_path, NUM_PROCESSES, special_tokens)
+    pretoken_counter = pretokenize(input_path, special_tokens)
     return _tokenizer_inner(pretoken_counter, vocab_size, special_tokens)
 
 
@@ -50,7 +27,7 @@ def _tokenizer_inner(
 
     # Prepare pretokens using the vocabulary
     shift = len(special_tokens)
-    pretokens = [(tuple(c + shift for c in seq.encode("utf-8")), cnt) for seq, cnt in pretoken_counter.items()]
+    pretokens = [[tuple(c + shift for c in seq.encode("utf-8")), cnt] for seq, cnt in pretoken_counter.items()]
 
     # Count pairs
     pair_counter = Counter()
@@ -93,7 +70,7 @@ def _tokenizer_inner(
                     i += 1
 
             # Update the pretoken
-            pretokens[pt_ind] = (new_pretoken, ptk_cnt)
+            pretokens[pt_ind][0] = new_pretoken
 
         # Update vocab, merges, and counts for the pair
         token1_bytes = vocab[pair[0]]
@@ -108,12 +85,31 @@ def _tokenizer_inner(
 if __name__ == "__main__":
     import pickle
 
-    PRETOKEN_PATH = "data/pretokens.pkl"
-    SPECIAL_TOKEN = "<|endoftext|>"
-    VOCAB_SIZE = 1000
+    SPECIAL_TOKENS = ["<|endoftext|>"]
+    DEBUG = False
 
-    with open(PRETOKEN_PATH, "rb") as f:
-        pretoken_counter = pickle.load(f)
+    if DEBUG:
+        PRETOKEN_PATH = "data/pretokens.pkl"
+        VOCAB_SIZE = 1000
 
-    vocab, merges = _tokenizer_inner(pretoken_counter, VOCAB_SIZE, [SPECIAL_TOKEN])
-    print(f"BPE has finished: vocabulary of size {len(vocab)} and {len(merges)} merges")
+        with open(PRETOKEN_PATH, "rb") as f:
+            pretoken_counter = pickle.load(f)
+
+        vocab, merges = _tokenizer_inner(pretoken_counter, VOCAB_SIZE, SPECIAL_TOKENS)
+        print(f"BPE has finished: vocabulary of size {len(vocab)} and {len(merges)} merges")
+    else:
+        TINY_STORIES = False
+
+        if TINY_STORIES:
+            INPUT_PATH = "data/TinyStoriesV2-GPT4-train.txt"
+            OUTPUT_PATH = "data/tiny_train.pkl"
+            VOCAB_SIZE = 10000
+        else:
+            INPUT_PATH = "data/owt_train.txt"
+            OUTPUT_PATH = "data/owt_train.pkl"
+            VOCAB_SIZE = 32000
+
+        vocab, merges = tokenizer(INPUT_PATH, VOCAB_SIZE, SPECIAL_TOKENS)
+
+        with open(OUTPUT_PATH, "wb") as f:
+            pickle.dump((vocab, merges), f)
