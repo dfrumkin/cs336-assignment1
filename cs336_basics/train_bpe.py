@@ -98,6 +98,7 @@ if __name__ == "__main__":
         vocab, merges = _tokenizer_inner(pretoken_counter, VOCAB_SIZE, SPECIAL_TOKENS)
         print(f"BPE has finished: vocabulary of size {len(vocab)} and {len(merges)} merges")
     else:
+        # scalene --html --reduced-profile --cpu --memory cs336_basics/train_bpe.py
         TINY_STORIES = False
 
         if TINY_STORIES:
