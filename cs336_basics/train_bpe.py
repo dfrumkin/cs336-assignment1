@@ -9,7 +9,7 @@ from cs336_basics.consts import NUM_PROCESSES
 from cs336_basics.pretokenizer import pretokenize
 
 
-def tokenizer(
+def train_bpe(
     input_path: str | os.PathLike,
     vocab_size: int,
     special_tokens: list[str],
@@ -19,7 +19,7 @@ def tokenizer(
     pretoken_counter = pretokenize(input_path, special_tokens, num_processes)
     point2 = time.perf_counter()
     print(f"Pretokenizer time: {point2 - point1:.3f}s")
-    return _tokenizer_inner(pretoken_counter, vocab_size, special_tokens, num_processes)
+    return _train_bpe_helper(pretoken_counter, vocab_size, special_tokens, num_processes)
 
 
 def actor(in_q: Queue, out_q: Queue):
@@ -82,7 +82,7 @@ def actor(in_q: Queue, out_q: Queue):
             break
 
 
-def _tokenizer_inner(
+def _train_bpe_helper(
     pretoken_counter: Counter[str],
     vocab_size: int,
     special_tokens: list[str],
@@ -166,7 +166,7 @@ if __name__ == "__main__":
         with open(PRETOKEN_PATH, "rb") as f:
             pretoken_counter = pickle.load(f)
 
-        vocab, merges = _tokenizer_inner(pretoken_counter, VOCAB_SIZE, SPECIAL_TOKENS)
+        vocab, merges = _train_bpe_helper(pretoken_counter, VOCAB_SIZE, SPECIAL_TOKENS)
         print(f"BPE has finished: vocabulary of size {len(vocab)} and {len(merges)} merges")
     else:
         # scalene --html --cpu --memory cs336_basics/train_bpe.py
@@ -184,7 +184,7 @@ if __name__ == "__main__":
             VOCAB_SIZE = 32000
 
         start = time.perf_counter()
-        vocab, merges = tokenizer(INPUT_PATH, VOCAB_SIZE, SPECIAL_TOKENS)
+        vocab, merges = train_bpe(INPUT_PATH, VOCAB_SIZE, SPECIAL_TOKENS)
         end = time.perf_counter()
 
         # This is an overestimation (sum of peak usages)
