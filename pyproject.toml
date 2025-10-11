@@ -21,6 +21,8 @@ dependencies = [
     "ty>=0.0.1a16",
     "jupyterlab>=4.4.9",
     "scalene>=1.5.55",
+    "ruff>=0.14.0",
+    "pre-commit>=4.3.0",
 ]
 
 [build-system]
@@ -41,14 +43,29 @@ log_cli_level = "WARNING"
 addopts = "-s"
 
 [tool.ruff]
+include = ["cs336_basics/**/*.py"]
+extend-exclude = ["cs336_basics/pretokenization_example.py"]
+
+target-version = "py312"
 line-length = 120
+respect-gitignore = true
 
 [tool.ruff.lint.extend-per-file-ignores]
 # Also ignore `E402` in all `__init__.py` files.
 "__init__.py" = ["E402", "F401", "F403", "E501"]
 
 [tool.ruff.lint]
-extend-select = ["UP"]
-ignore = [
-    "F722"
+extend-select = [
+  "E", "F",       # Pyflakes/pycodestyle basics
+  "I",            # Import sorting (isort)
+  "UP",           # pyupgrade
+  "B",            # flake8-bugbear
+  "SIM",          # flake8-simplify
+  "W",            # pycodestyle warnings
 ]
+
+[tool.ruff.format]
+docstring-code-format = true
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false

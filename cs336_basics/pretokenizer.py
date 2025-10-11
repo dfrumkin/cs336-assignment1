@@ -1,31 +1,33 @@
 import os
-from typing import BinaryIO
-import regex as re
 from collections import Counter
-from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
+from typing import BinaryIO
 
-PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-NUM_PROCESSES = min(32, os.cpu_count() or 1)
+import regex as re
+from tqdm import tqdm
+
+from cs336_basics.consts import MAX_CHUNK_SIZE, NUM_PROCESSES, PAT
 
 
 def find_chunk_boundaries(
-    file: BinaryIO, 
-    desired_num_chunks: int,
-    pattern: bytes,
+    file: BinaryIO,
+    num_processes: int,
+    max_chunk_size: int,
+    pattern: re.Pattern[bytes],
 ) -> list[int]:
     """
     Chunk the file into parts that can be counted independently.
     May return fewer chunks if the boundaries end up overlapping.
     """
-        
+
     # Get total file size in bytes
     file.seek(0, os.SEEK_END)
     file_size = file.tell()
     file.seek(0)
 
-    chunk_size = file_size // desired_num_chunks
+    chunk_size = min(file_size // num_processes, max_chunk_size)
+    desired_num_chunks = file_size // chunk_size
 
     # Initial guesses for chunk boundary locations, uniformly spaced
     # Chunks start on previous index, don't include last index
@@ -62,9 +64,9 @@ def process_chunk(
     input_path: str | os.PathLike,
     start: int,
     end: int,
-    pattern: str,
-) -> Counter:
-    with open(input_path, "rb") as f: 
+    pattern: re.Pattern[str],
+) -> Counter[str]:
+    with open(input_path, "rb") as f:
         f.seek(start)
         chunk = f.read(end - start).decode("utf-8", errors="ignore")
         chunks = re.split(pattern, chunk)
@@ -74,43 +76,39 @@ def process_chunk(
     return counter
 
 
-def pretokenize(   
+def pretokenize(
     input_path: str | os.PathLike,
     special_tokens: list[str],
-    num_processes: int = NUM_PROCESSES, 
-) -> Counter:
-
-    byte_pattern = b"|".join(re.escape(token.encode("utf-8")) for token in special_tokens)
+    num_processes: int = NUM_PROCESSES,
+    max_chunk_size: int = MAX_CHUNK_SIZE,
+) -> Counter[str]:
+    byte_pattern = re.compile(
+        b"|".join(sorted([re.escape(token.encode("utf-8")) for token in special_tokens], key=len, reverse=True))
+    )
 
     with open(input_path, "rb") as f:
-        boundaries = find_chunk_boundaries(
-            f, num_processes, byte_pattern)
+        boundaries = find_chunk_boundaries(f, num_processes, max_chunk_size, byte_pattern)
 
     # Pattern for matching special tokens
-    pattern = "|".join(re.escape(token) for token in special_tokens)
+    pattern = re.compile("|".join(sorted(map(re.escape, special_tokens), key=len, reverse=True)))
 
     with ProcessPoolExecutor(max_workers=num_processes) as ex:
         # ex.map gives you an iterator over results in order
-        it = ex.map(process_chunk,
-                    repeat(input_path),
-                    boundaries[:-1],
-                    boundaries[1:],
-                    repeat(pattern))
-    
-        counters = list(tqdm(it, total=len(boundaries) - 1))
-                            
-    return sum(counters, Counter())
+        it = ex.map(process_chunk, repeat(input_path), boundaries[:-1], boundaries[1:], repeat(pattern))
+
+        return sum(tqdm(it, total=len(boundaries) - 1), Counter())
 
 
 if __name__ == "__main__":
     import pickle
 
-    INPUT_PATH = "data/TinyStoriesV2-GPT4-valid.txt"
-    # INPUT_PATH = "data/TinyStoriesV2-GPT4-train.txt"
-    OUTPUT_PATH = "data/pretokens.pkl"
-    SPECIAL_TOKEN = "<|endoftext|>"
+    from cs336_basics.consts import SPECIAL_TOKENS
 
-    counter = pretokenize(INPUT_PATH, [SPECIAL_TOKEN])
+    # INPUT_PATH = "data/TinyStoriesV2-GPT4-valid.txt"
+    INPUT_PATH = "data/TinyStoriesV2-GPT4-train.txt"
+    OUTPUT_PATH = "data/pretokens.pkl"
+
+    counter = pretokenize(INPUT_PATH, SPECIAL_TOKENS)
     print("Number of pre-tokens:", len(counter))
 
     print(f"Saving to {OUTPUT_PATH}")
