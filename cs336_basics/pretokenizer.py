@@ -48,7 +48,7 @@ def find_chunk_boundaries(
                 break
 
             # Find the first special token in the mini chunk
-            match = re.search(pattern, mini_chunk)
+            match = pattern.search(mini_chunk)
             found_at = match.start() if match else -1
 
             if found_at != -1:
@@ -69,10 +69,10 @@ def process_chunk(
     with open(input_path, "rb") as f:
         f.seek(start)
         chunk = f.read(end - start).decode("utf-8", errors="ignore")
-        chunks = re.split(pattern, chunk)
+        chunks = pattern.split(chunk)
     counter = Counter()
     for ch in chunks:
-        counter.update(Counter(m.group(0) for m in re.finditer(PAT, ch)))
+        counter.update(Counter(m.group(0) for m in PAT.finditer(ch)))
     return counter
 
 

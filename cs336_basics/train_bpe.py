@@ -193,7 +193,7 @@ if __name__ == "__main__":
         )
         peak_memory_mb = peak_usage / (1024**2 if sys.platform == "darwin" else 1024)
 
-        print(f"Total time: {end - start:.3f}s; peak memory: {peak_memory_mb:.1f} MB")
+        print(f"Total time: {end - start:.3f}s; memory usage: {peak_memory_mb:.1f} MB")
 
         # pickle is fine since dict, list, tuple, int, bytes - are primitive datatypes, stable across versions
         with open(VOCAB_OUTPUT_PATH, "wb") as f:
