@@ -11,10 +11,12 @@ from cs336_basics.consts import PAT, SPECIAL_TOKENS
 class PairHeap:
     """Min-heap of candidate merges with staleness checks via version counters."""
 
-    def __init__(self, ids: list[int], merges: dict[tuple[int, int], int]) -> None:
+    def __init__(
+        self, ids: list[int], merges: dict[tuple[int, int], int], pair_rank: dict[tuple[int, int], int]
+    ) -> None:
         self._ids = ids
         self._merges = merges
-        self._pair_rank = {pair: rank for rank, pair in enumerate(merges)}
+        self._pair_rank = pair_rank
         n_tokens = len(ids)
 
         # Build initial entries only for adjacent, mergeable pairs
@@ -114,6 +116,8 @@ class Tokenizer:
         self._merges = {
             (self._inverse_vocab[b1], self._inverse_vocab[b2]): self._inverse_vocab[b1 + b2] for (b1, b2) in merges
         }
+        # Precompute pair-rank from merges order once for speed
+        self._pair_rank = {pair: rank for rank, pair in enumerate(self._merges)}
 
     @classmethod
     def from_files(cls, vocab_filepath: str, merges_filepath: str, special_tokens: list[str] | None = None) -> Self:
@@ -154,7 +158,7 @@ class Tokenizer:
                     for m in PAT.finditer(seg):
                         pretoken = seg[m.start() : m.end()]
                         tokens = [self._inverse_vocab[bytes([b])] for b in pretoken.encode("utf-8")]
-                        pair_heap = PairHeap(tokens, self._merges)
+                        pair_heap = PairHeap(tokens, self._merges, self._pair_rank)
                         out.extend(pair_heap.merge())
                 else:
                     out.append(self._inverse_vocab[seg.encode("utf-8")])
