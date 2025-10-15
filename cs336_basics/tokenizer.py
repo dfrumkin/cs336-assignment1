@@ -191,3 +191,40 @@ class Tokenizer:
         except KeyError as e:
             raise KeyError(f"Unknown token id: {e.args[0]}") from None
         return data.decode("utf-8", errors="replace")
+
+
+if __name__ == "__main__":
+    import os
+    import time
+
+    import numpy as np
+
+    BUFFER_SIZE = 8 * 1024 * 1024  # 8 MB
+    # TINY_ENCODER = True
+    # IN_PATH = "data/TinyStoriesV2-GPT4-valid_sample.txt"
+    TINY_ENCODER = False
+    IN_PATH = "data/owt_train.txt"
+
+    if TINY_ENCODER:
+        VOCAB_PATH = "data/tiny_train_vocab.pkl"
+        MERGES_PATH = "data/tiny_train_merges.pkl"
+        SUFFIX = "_tiny"
+    else:
+        VOCAB_PATH = "data/owt_train_vocab.pkl"
+        MERGES_PATH = "data/owt_train_merges.pkl"
+        SUFFIX = "_owt"
+
+    OUT_PATH = IN_PATH[:-4] + SUFFIX + ".tokens"
+
+    tokenizer = Tokenizer.from_files(VOCAB_PATH, MERGES_PATH)
+
+    start = time.perf_counter()
+    with open(IN_PATH, buffering=BUFFER_SIZE) as fin, open(OUT_PATH, "wb", buffering=BUFFER_SIZE) as fout:
+        np.fromiter(tokenizer.encode_iterable(fin), dtype=np.uint16, count=-1).tofile(fout)
+    end = time.perf_counter()
+
+    bytes = os.path.getsize(IN_PATH)
+    tokens = os.path.getsize(OUT_PATH) // 2
+
+    print(f"Compression ratio (bytes / tokens): {bytes / tokens:.1f}")
+    print(f"Throughput (MB / sec): {bytes / (end - start) / (1024 * 1024):.1f}")
