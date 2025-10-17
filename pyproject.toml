@@ -55,6 +55,7 @@ respect-gitignore = true
 "__init__.py" = ["E402", "F401", "F403", "E501"]
 
 [tool.ruff.lint]
+ignore = ["F722"] # jaxtyping annotations
 extend-select = [
   "E", "F",       # Pyflakes/pycodestyle basics
   "I",            # Import sorting (isort)
