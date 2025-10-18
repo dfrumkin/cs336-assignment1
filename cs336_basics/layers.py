@@ -15,8 +15,8 @@ class Linear(nn.Module):
         Args:
             in_features (int): Final dimension of the input
             out_features (int): Final dimension of the output
-            device (torch.device | None, optional): Device to store the parameters on
-            dtype (torch.dtype | None, optional): Data type of the parameters
+            device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+            dtype (torch.dtype | None, optional): Data type of the parameters. Defaults to None.
         """
         super().__init__()
         self.weights = nn.Parameter(torch.empty((out_features, in_features), dtype=dtype, device=device))
@@ -47,20 +47,54 @@ class Embedding(nn.Module):
 
         Args:
             num_embeddings (int): Size of the vocabulary
-            embedding_dim (int): Dimension of the embedding vectors
-            device (torch.device | None, optional): Device to store the parameters on
-            dtype (torch.dtype | None, optional): Data type of the parameters
+            embedding_dim (int): Dimension of the embedding vectors, i.e. d_model
+            device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+            dtype (torch.dtype | None, optional): Data type of the parameters. Defaults to None.
         """
         super().__init__()
         self.embeddings = nn.Parameter(torch.empty((num_embeddings, embedding_dim), dtype=dtype, device=device))
         nn.init.trunc_normal_(self.embeddings, 0.0, 1.0, -3.0, 3.0)
 
-    def forward(self, token_ids: Int[Tensor, " ..."]) -> Float[Tensor, "... embedding_dim"]:
+    def forward(self, token_ids: Int[Tensor, " ..."]) -> Float[Tensor, "... d_model"]:
         """Lookup the embedding vectors for the given token IDs.
 
         Args:
             token_ids: (Int[Tensor, "..."]): Token IDs
         Returns:
-            Float[Tensor, "... embedding_dim"]: Token embedding vectors
+            Float[Tensor, "... d_model"]: Token embedding vectors
         """
-        return einx.get_at("[num_embeddings] embedding_dim, ... -> ... embedding_dim", self.embeddings, token_ids)
+        return einx.get_at("[num_embeddings] d_model, ... -> ... d_model", self.embeddings, token_ids)
+
+
+class RMSNorm(nn.Module):
+    def __init__(
+        self, d_model: int, eps: float = 1e-5, device: torch.device | None = None, dtype: torch.dtype | None = None
+    ) -> None:
+        """Construct the RMSNorm module.
+
+        Args:
+            d_model (int): Hidden dimension of the model
+            eps (float, optional): Epsilon value for numerical stability. Defaults to 1e-5.
+            device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+            dtype (torch.dtype | None, optional): Data type of the parameters. Defaults to None.
+        """
+        super().__init__()
+        self.gain = nn.Parameter(torch.ones(d_model, dtype=dtype, device=device))
+        self.eps = eps
+
+    def forward(self, x: Float[Tensor, " ... d_model"]) -> Float[Tensor, " ... d_model"]:
+        """Apply RMS normalization to the input tensor.
+
+        Args:
+            x (Float[Tensor, " ... d_model"]): Input tensor
+
+        Returns:
+            Float[Tensor, " ... d_model"]: Normalized output tensor of the same shape
+        """
+        in_dtype = x.dtype
+        x = x.to(torch.float32)
+
+        result = (x / torch.sqrt(x.pow(2).mean(dim=-1, keepdim=True) + self.eps)) * self.gain
+
+        # Return the result in the original dtype
+        return result.to(in_dtype)
