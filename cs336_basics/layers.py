@@ -24,7 +24,7 @@ class Linear(nn.Module):
         nn.init.trunc_normal_(self.weights, 0.0, sigma, -3.0, 3.0)
 
     def forward(self, x: Float[Tensor, "... in_features"]) -> Float[Tensor, "... out_features"]:
-        """Apply the linear transformation to the input
+        """Applies the linear transformation to the input
 
         Args:
             x (Float[Tensor, "... in_features"]): Input tensor
@@ -70,7 +70,7 @@ class RMSNorm(nn.Module):
     def __init__(
         self, d_model: int, eps: float = 1e-5, device: torch.device | None = None, dtype: torch.dtype | None = None
     ) -> None:
-        """Construct the RMSNorm module.
+        """Constructs an RMSNorm module.
 
         Args:
             d_model (int): Hidden dimension of the model
@@ -83,7 +83,7 @@ class RMSNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x: Float[Tensor, " ... d_model"]) -> Float[Tensor, " ... d_model"]:
-        """Apply RMS normalization to the input tensor.
+        """Applies RMS normalization to the input tensor.
 
         Args:
             x (Float[Tensor, " ... d_model"]): Input tensor
@@ -98,3 +98,39 @@ class RMSNorm(nn.Module):
 
         # Return the result in the original dtype
         return result.to(in_dtype)
+
+
+class SwiGLU(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        d_ff: int | None = None,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> None:
+        """Constructs a SwiGLU FFN.
+
+        Args:
+            d_model (int): Hidden dimension of the model
+            d_ff (int | None, optional): _description_. Defaults to approximately 8/3*d_model.
+            device (torch.device | None, optional): _description_. Defaults to None.
+            dtype (torch.dtype | None, optional): _description_. Defaults to None.
+        """
+        super().__init__()
+        if d_ff is None:
+            d_ff = int(((d_model * 8 / 3 + 32) // 64) * 64)
+        self.w1 = Linear(d_model, d_ff, device, dtype)
+        self.w2 = Linear(d_ff, d_model, device, dtype)
+        self.w3 = Linear(d_model, d_ff, device, dtype)
+
+    def forward(self, x: Float[Tensor, "... d_model"]) -> Float[Tensor, "... d_model"]:
+        """Applies SwiGLU to the input tensor
+
+        Args:
+            x (Float[Tensor, " ... d_model"]): Input tensor
+
+        Returns:
+            Float[Tensor, "... d_model"]: Output tensor
+        """
+        w1 = self.w1(x)
+        return self.w2(w1 * torch.sigmoid(w1) * self.w3(x))

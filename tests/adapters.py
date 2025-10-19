@@ -9,7 +9,7 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
-from cs336_basics.layers import Embedding, Linear, RMSNorm
+from cs336_basics.layers import Embedding, Linear, RMSNorm, SwiGLU
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe import train_bpe
 
@@ -82,14 +82,11 @@ def run_swiglu(
     Returns:
         Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
     """
-    # Example:
-    # If your state dict keys match, you can use `load_state_dict()`
-    # swiglu.load_state_dict(weights)
-    # You can also manually assign the weights
-    # swiglu.w1.weight.data = w1_weight
-    # swiglu.w2.weight.data = w2_weight
-    # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    swiglu = SwiGLU(d_model, d_ff)
+    swiglu.w1.load_state_dict({"weights": w1_weight})
+    swiglu.w2.load_state_dict({"weights": w2_weight})
+    swiglu.w3.load_state_dict({"weights": w3_weight})
+    return swiglu(in_features)
 
 
 def run_scaled_dot_product_attention(
