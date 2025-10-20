@@ -150,7 +150,7 @@ class SwiGLU(nn.Module):
 
 
 class RotaryPositionEmbedding(nn.Module):
-    cos_sin: Float[Tensor, "max_seq_len 2"]
+    cos_sin: Float[Tensor, "l n 2"]
 
     def __init__(self, theta: float, d_k: int, max_seq_len: int, device: torch.device | None = None) -> None:
         """Constructs the RoPE module.
@@ -180,7 +180,7 @@ class RotaryPositionEmbedding(nn.Module):
         self.register_buffer("cos_sin", cos_sin, persistent=False)
 
     def forward(
-        self, x: Float[Tensor, " ... seq_len d_k"], token_positions: Float[Tensor, " ... seq_len"]
+        self, x: Float[Tensor, " ... seq_len d_k"], token_positions: Int[Tensor, " ... seq_len"]
     ) -> Float[Tensor, " ... seq_len d_k"]:
         """Applies RoPE to the input tensor
 
@@ -192,7 +192,7 @@ class RotaryPositionEmbedding(nn.Module):
         """
 
         # Select relevant rotations
-        cos_sin = self.cos_sin[token_positions]
+        cos_sin = einx.get_at("[l] n p, ... i -> ... i n p", self.cos_sin, token_positions, p=2)
 
         # Split into pairs (n == d_k / 2)
         x2 = einx.rearrange("... l (n p) -> ... l n p", x, p=2)
