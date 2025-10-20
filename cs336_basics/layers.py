@@ -163,7 +163,7 @@ class RotaryPositionEmbedding(nn.Module):
         """
         super().__init__()
 
-        # Frequency within a token
+        # Frequencies within a token
         n = torch.arange(d_k // 2, device=device)
         inv_freq = theta ** (-2 * n / d_k)
 
@@ -208,3 +208,17 @@ class RotaryPositionEmbedding(nn.Module):
         y = einx.rearrange("... l n p -> ... l (n p)", torch.stack([y_even, y_odd], dim=-1), p=2)
 
         return y  # type: ignore[assignment]
+
+
+def softmax(x: Float[Tensor, "..."], dim: int) -> Float[Tensor, "..."]:
+    """Applies softmax along the given dimension
+
+    Args:
+        x (Float[Tensor, "..."]): Input tensor
+        dim (int): Dimension
+
+    Returns:
+        Float[Tensor, "..."]: Output tensor
+    """
+    exps = torch.exp(x - x.amax(dim, keepdim=True))
+    return exps / exps.sum(dim, keepdim=True)
