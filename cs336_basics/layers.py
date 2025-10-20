@@ -2,7 +2,7 @@ import math
 
 import einx
 import torch
-from jaxtyping import Float, Int
+from jaxtyping import Bool, Float, Int
 from torch import Tensor, nn
 
 
@@ -182,7 +182,7 @@ class RotaryPositionEmbedding(nn.Module):
     def forward(
         self, x: Float[Tensor, " ... seq_len d_k"], token_positions: Int[Tensor, " ... seq_len"]
     ) -> Float[Tensor, " ... seq_len d_k"]:
-        """Applies RoPE to the input tensor
+        """Applies RoPE to the input tensor.
 
         Args:
             x (Float[Tensor, " ... seq_len d_k"]): Input tensor
@@ -195,23 +195,25 @@ class RotaryPositionEmbedding(nn.Module):
         cos_sin = einx.get_at("[l] n p, ... i -> ... i n p", self.cos_sin, token_positions, p=2)
 
         # Split into pairs (n == d_k / 2)
-        x2 = einx.rearrange("... l (n p) -> ... l n p", x, p=2)
+        x2: Float[Tensor, "... seq_len n 2"] = einx.rearrange("... l (n p) -> ... l n p", x, p=2)  # type: ignore[assignment]
 
         # Multiply by cosines and sines (outer product)
         prods = einx.multiply("... l n p, l n q -> ... l n p q", x2, cos_sin, p=2, q=2)
 
         # Combine into rotated components
-        y_even = prods[..., 0, 0] - prods[..., 1, 1]  # type: ignore[assignment]
-        y_odd = prods[..., 1, 0] + prods[..., 0, 1]  # type: ignore[assignment]
+        y_even = prods[..., 0, 0] - prods[..., 1, 1]
+        y_odd = prods[..., 1, 0] + prods[..., 0, 1]
 
         # Merge rotated vectors
-        y = einx.rearrange("... l n p -> ... l (n p)", torch.stack([y_even, y_odd], dim=-1), p=2)
+        y: Float[Tensor, "... seq_len d_k"] = einx.rearrange(
+            "... l n p -> ... l (n p)", torch.stack([y_even, y_odd], dim=-1), p=2
+        )  # type: ignore[assignment]
 
-        return y  # type: ignore[assignment]
+        return y
 
 
 def softmax(x: Float[Tensor, "..."], dim: int) -> Float[Tensor, "..."]:
-    """Applies softmax along the given dimension
+    """Applies softmax along the given dimension.
 
     Args:
         x (Float[Tensor, "..."]): Input tensor
@@ -222,3 +224,30 @@ def softmax(x: Float[Tensor, "..."], dim: int) -> Float[Tensor, "..."]:
     """
     exps = torch.exp(x - x.amax(dim, keepdim=True))
     return exps / exps.sum(dim, keepdim=True)
+
+
+def scaled_dot_product_attention(
+    queries: Float[Tensor, " ... seq_len d_k"],
+    keys: Float[Tensor, " ... seq_len d_k"],
+    values: Float[Tensor, " ... seq_len d_v"],
+    mask: Bool[Tensor, "seq_len seq_len"] | None = None,
+) -> Float[Tensor, " ... seq_len d_v"]:
+    """Computes the scaled dot-product attention.
+    Args:
+        queries (Float[Tensor, " ... seq_len d_k"]): Queries
+        keys (Float[Tensor, " ... seq_len d_k"]): Keys
+        values (Float[Tensor, " ... seq_len d_v"]): Values
+        mask (Bool[Tensor, "seq_len seq_len"] | None, optional): Attention mask.  Defaults to None.
+
+    Returns:
+        Float[Tensor, " ... seq_len d_v"]: Attention output
+    """
+    scores = einx.dot("b ... i d, b ... j d -> b ... i j", queries, keys) / math.sqrt(keys.shape[-1])
+
+    if mask is not None:
+        scores = torch.where(mask, scores, -torch.inf)
+
+    scores = softmax(scores, dim=-1)
+    out = einx.dot("... i j, ... j d -> ... i d", scores, values)
+
+    return out
