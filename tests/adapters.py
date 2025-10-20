@@ -9,7 +9,7 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
-from cs336_basics.layers import Embedding, Linear, RMSNorm, SwiGLU
+from cs336_basics.layers import Embedding, Linear, RMSNorm, RotaryPositionEmbedding, SiLU, SwiGLU
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe import train_bpe
 
@@ -203,7 +203,8 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
+    rotary = RotaryPositionEmbedding(theta, d_k, max_seq_len)
+    return rotary(in_query_or_key, token_positions)
 
 
 def run_transformer_block(
@@ -397,7 +398,8 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    raise NotImplementedError
+    silu = SiLU()
+    return silu(in_features)
 
 
 def run_get_batch(

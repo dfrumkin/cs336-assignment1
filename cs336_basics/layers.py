@@ -100,6 +100,19 @@ class RMSNorm(nn.Module):
         return result.to(in_dtype)
 
 
+class SiLU(nn.Module):
+    def forward(self, x: Float[Tensor, "... d_model"]) -> Float[Tensor, "... d_model"]:
+        """Applies SiLU to the input tensor
+
+        Args:
+            x (Float[Tensor, " ... d_model"]): Input tensor
+
+        Returns:
+            Float[Tensor, "... d_model"]: Output tensor
+        """
+        return x * torch.sigmoid(x)
+
+
 class SwiGLU(nn.Module):
     def __init__(
         self,
@@ -113,12 +126,13 @@ class SwiGLU(nn.Module):
         Args:
             d_model (int): Hidden dimension of the model
             d_ff (int | None, optional): _description_. Defaults to approximately 8/3*d_model.
-            device (torch.device | None, optional): _description_. Defaults to None.
-            dtype (torch.dtype | None, optional): _description_. Defaults to None.
+            device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+            dtype (torch.dtype | None, optional): Data type of the parameters. Defaults to None.
         """
         super().__init__()
         if d_ff is None:
             d_ff = int(((d_model * 8 / 3 + 32) // 64) * 64)
+        self.silu = SiLU()
         self.w1 = Linear(d_model, d_ff, device, dtype)
         self.w2 = Linear(d_ff, d_model, device, dtype)
         self.w3 = Linear(d_model, d_ff, device, dtype)
@@ -132,5 +146,65 @@ class SwiGLU(nn.Module):
         Returns:
             Float[Tensor, "... d_model"]: Output tensor
         """
-        w1 = self.w1(x)
-        return self.w2(w1 * torch.sigmoid(w1) * self.w3(x))
+        return self.w2(self.silu(self.w1(x)) * self.w3(x))
+
+
+class RotaryPositionEmbedding(nn.Module):
+    cos_sin: Float[Tensor, "max_seq_len 2"]
+
+    def __init__(self, theta: float, d_k: int, max_seq_len: int, device: torch.device | None = None) -> None:
+        """Constructs the RoPE module.
+
+        Args:
+            theta (float): Theta value for the RoPE
+            d_k (int): Dimension of query and key vectors
+            max_seq_len (int): Maximum sequence length that will be inputted
+            device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+        """
+        super().__init__()
+
+        # Frequency within a token
+        n = torch.arange(d_k // 2, device=device)
+        inv_freq = theta ** (-2 * n / d_k)
+
+        # Token position
+        pos = torch.arange(max_seq_len, device=device)
+
+        # Outer product
+        angles = einx.multiply("l, n -> l n", pos, inv_freq)
+
+        # Compute cosines and sines
+        cos_sin = torch.stack([angles.cos(), angles.sin()], dim=-1)
+
+        # Register as buffer (not trainable and not part of state_dict)
+        self.register_buffer("cos_sin", cos_sin, persistent=False)
+
+    def forward(
+        self, x: Float[Tensor, " ... seq_len d_k"], token_positions: Float[Tensor, " ... seq_len"]
+    ) -> Float[Tensor, " ... seq_len d_k"]:
+        """Applies RoPE to the input tensor
+
+        Args:
+            x (Float[Tensor, " ... seq_len d_k"]): Input tensor
+
+        Returns:
+            Float[Tensor, " ... seq_len d_k"]: Output tensor
+        """
+
+        # Select relevant rotations
+        cos_sin = self.cos_sin[token_positions]
+
+        # Split into pairs (n == d_k / 2)
+        x2 = einx.rearrange("... l (n p) -> ... l n p", x, p=2)
+
+        # Multiply by cosines and sines (outer product)
+        prods = einx.multiply("... l n p, l n q -> ... l n p q", x2, cos_sin, p=2, q=2)
+
+        # Combine into rotated components
+        y_even = prods[..., 0, 0] - prods[..., 1, 1]  # type: ignore[assignment]
+        y_odd = prods[..., 1, 0] + prods[..., 0, 1]  # type: ignore[assignment]
+
+        # Merge rotated vectors
+        y = einx.rearrange("... l n p -> ... l (n p)", torch.stack([y_even, y_odd], dim=-1), p=2)
+
+        return y  # type: ignore[assignment]
