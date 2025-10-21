@@ -198,7 +198,7 @@ class RotaryPositionEmbedding(nn.Module):
         x2: Float[Tensor, "... seq_len n 2"] = einx.rearrange("... l (n p) -> ... l n p", x, p=2)  # type: ignore[assignment]
 
         # Multiply by cosines and sines (outer product)
-        prods = einx.multiply("... l n p, l n q -> ... l n p q", x2, cos_sin, p=2, q=2)
+        prods = einx.multiply("... l n p, ... l n q -> ... l n p q", x2, cos_sin, p=2, q=2)
 
         # Combine into rotated components
         y_even = prods[..., 0, 0] - prods[..., 1, 1]
@@ -251,3 +251,55 @@ def scaled_dot_product_attention(
     out = einx.dot("... i j, ... j d -> ... i d", scores, values)
 
     return out
+
+
+class MultiHeadSelfAttention(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        rope: RotaryPositionEmbedding | None = None,
+        device: torch.device | None = None,
+    ) -> None:
+        """Constructs causal multi-head self-attention.
+
+        Args:
+            d_model (int): Hidden dimension of the model
+            num_heads (int): Number of attention heads
+            rope (RotaryPositionEmbedding | None, optional): RoPE module. Defaults to None.
+            device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+        """
+        super().__init__()
+        self.num_heads = num_heads
+        self.d_kv = d_model // num_heads
+        self.qkv = Linear(d_model, 3 * d_model, device=device)
+        self.out = Linear(d_model, d_model, device=device)
+        self.rope = rope
+
+    def forward(self, x: Float[Tensor, "... seq_len d_model"]) -> Float[Tensor, "... seq_len d_model"]:
+        """Applies multi-head self-attention to the input tensor.
+
+        Args:
+            x (Float[Tensor, "... seq_len d_model"]): Input tensor
+        Returns:
+            _type_: Output tensor
+        """
+        seq_len = x.shape[-2]
+        qkv = self.qkv(x)
+        qkv3: Float[Tensor, "3 ... num_heads seq_len d_model"] = einx.rearrange(
+            "... t (three h d) -> three ... h t d", qkv, three=3, h=self.num_heads, t=seq_len, d=self.d_kv
+        )  # type: ignore
+        q, k, v = qkv3.unbind(0)
+
+        if self.rope:
+            pos = torch.arange(seq_len, device=q.device, dtype=torch.long)
+            zeros = q.new_zeros(*q.shape[:-1], dtype=torch.long)
+            token_positions = einx.add("... t, t -> ... t", zeros, pos, t=seq_len)
+
+            q = self.rope(q, token_positions)
+            k = self.rope(k, token_positions)
+
+        mask = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool))
+        attention_out = scaled_dot_product_attention(q, k, v, mask)
+        concat = einx.rearrange("... h t d -> ... t (h d)", attention_out, t=seq_len, h=self.num_heads, d=self.d_kv)
+        return self.out(concat)
