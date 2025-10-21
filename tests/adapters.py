@@ -9,7 +9,7 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
-from cs336_basics.layers import (
+from cs336_basics.model import (
     Embedding,
     Linear,
     MultiHeadSelfAttention,
@@ -17,11 +17,36 @@ from cs336_basics.layers import (
     RotaryPositionEmbedding,
     SiLU,
     SwiGLU,
+    TransformerBlock,
     scaled_dot_product_attention,
     softmax,
 )
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe import train_bpe
+
+
+def _load_linear_weights(linear, weights):
+    linear.load_state_dict({"weights": weights})
+
+
+def _load_embedding_weights(embedding, weights):
+    embedding.load_state_dict({"embeddings": weights})
+
+
+def _load_swiglu_weights(swiglu, w1_weight, w2_weight, w3_weight):
+    swiglu.w1.load_state_dict({"weights": w1_weight})
+    swiglu.w2.load_state_dict({"weights": w2_weight})
+    swiglu.w3.load_state_dict({"weights": w3_weight})
+
+
+def _load_attn_weights(attn, q_proj_weight, k_proj_weight, v_proj_weight, o_proj_weight):
+    qkv_proj_weight = torch.cat([q_proj_weight, k_proj_weight, v_proj_weight])
+    _load_linear_weights(attn.qkv, qkv_proj_weight)
+    _load_linear_weights(attn.out, o_proj_weight)
+
+
+def _load_rmsnorm_weights(rmsnorm, weights):
+    rmsnorm.load_state_dict({"gain": weights})
 
 
 def run_linear(
@@ -43,7 +68,7 @@ def run_linear(
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
     linear = Linear(d_in, d_out)
-    linear.load_state_dict({"weights": weights})
+    _load_linear_weights(linear, weights)
     return linear(in_features)
 
 
@@ -66,7 +91,7 @@ def run_embedding(
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
     embedding = Embedding(vocab_size, d_model)
-    embedding.load_state_dict({"embeddings": weights})
+    _load_embedding_weights(embedding, weights)
     return embedding(token_ids)
 
 
@@ -93,9 +118,7 @@ def run_swiglu(
         Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
     """
     swiglu = SwiGLU(d_model, d_ff)
-    swiglu.w1.load_state_dict({"weights": w1_weight})
-    swiglu.w2.load_state_dict({"weights": w2_weight})
-    swiglu.w3.load_state_dict({"weights": w3_weight})
+    _load_swiglu_weights(swiglu, w1_weight, w2_weight, w3_weight)
     return swiglu(in_features)
 
 
@@ -151,13 +174,9 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    multi_head_self_attention = MultiHeadSelfAttention(d_model, num_heads)
-
-    qkv_proj_weight = torch.cat([q_proj_weight, k_proj_weight, v_proj_weight])
-    multi_head_self_attention.qkv.load_state_dict({"weights": qkv_proj_weight})
-    multi_head_self_attention.out.load_state_dict({"weights": o_proj_weight})
-
-    return multi_head_self_attention(in_features)
+    attn = MultiHeadSelfAttention(d_model, num_heads)
+    _load_attn_weights(attn, q_proj_weight, k_proj_weight, v_proj_weight, o_proj_weight)
+    return attn(in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -198,13 +217,9 @@ def run_multihead_self_attention_with_rope(
         implementation with the given QKV projection weights and input features.
     """
     rope = RotaryPositionEmbedding(theta, d_model // num_heads, max_seq_len)
-    multi_head_self_attention = MultiHeadSelfAttention(d_model, num_heads, rope)
-
-    qkv_proj_weight = torch.cat([q_proj_weight, k_proj_weight, v_proj_weight])
-    multi_head_self_attention.qkv.load_state_dict({"weights": qkv_proj_weight})
-    multi_head_self_attention.out.load_state_dict({"weights": o_proj_weight})
-
-    return multi_head_self_attention(in_features)
+    attn = MultiHeadSelfAttention(d_model, num_heads, rope)
+    _load_attn_weights(attn, q_proj_weight, k_proj_weight, v_proj_weight, o_proj_weight)
+    return attn(in_features, token_positions)
 
 
 def run_rope(
@@ -300,7 +315,24 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    d_k = d_model // num_heads
+    rope = RotaryPositionEmbedding(theta, d_k, max_seq_len)
+    transformer_block = TransformerBlock(d_model, num_heads, d_ff, rope)
+
+    _load_attn_weights(
+        transformer_block.attn,
+        weights["attn.q_proj.weight"],
+        weights["attn.k_proj.weight"],
+        weights["attn.v_proj.weight"],
+        weights["attn.output_proj.weight"],
+    )
+    _load_rmsnorm_weights(transformer_block.ln1, weights["ln1.weight"])
+    _load_swiglu_weights(
+        transformer_block.ffn, weights["ffn.w1.weight"], weights["ffn.w2.weight"], weights["ffn.w3.weight"]
+    )
+    _load_rmsnorm_weights(transformer_block.ln2, weights["ln2.weight"])
+
+    return transformer_block(in_features)
 
 
 def run_transformer_lm(
@@ -406,7 +438,7 @@ def run_rmsnorm(
         RMSNorm of the `in_features`.
     """
     rmsnorm = RMSNorm(d_model, eps)
-    rmsnorm.load_state_dict({"gain": weights})
+    _load_rmsnorm_weights(rmsnorm, weights)
     return rmsnorm(in_features)
 
 

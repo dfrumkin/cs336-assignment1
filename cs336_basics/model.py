@@ -186,10 +186,14 @@ class RotaryPositionEmbedding(nn.Module):
 
         Args:
             x (Float[Tensor, " ... seq_len d_k"]): Input tensor
+            token_positions (Int[Tensor, " ... seq_len"]): Token positions.
 
         Returns:
             Float[Tensor, " ... seq_len d_k"]: Output tensor
         """
+        # Cast the input to float32
+        in_dtype = x.dtype
+        x = x.to(torch.float32)
 
         # Select relevant rotations
         cos_sin = einx.get_at("[l] n p, ... i -> ... i n p", self.cos_sin, token_positions, p=2)
@@ -209,7 +213,8 @@ class RotaryPositionEmbedding(nn.Module):
             "... l n p -> ... l (n p)", torch.stack([y_even, y_odd], dim=-1), p=2
         )  # type: ignore[assignment]
 
-        return y
+        # Return the result in the original dtype
+        return y.to(in_dtype)
 
 
 def softmax(x: Float[Tensor, "..."], dim: int) -> Float[Tensor, "..."]:
@@ -220,9 +225,13 @@ def softmax(x: Float[Tensor, "..."], dim: int) -> Float[Tensor, "..."]:
         dim (int): Dimension
 
     Returns:
-        Float[Tensor, "..."]: Output tensor
+        Float[Tensor, "..."]: Output tensor - always as float32
     """
+    # Cast the input to float32 for exponentiation
+    x = x.to(torch.float32)
+
     exps = torch.exp(x - x.amax(dim, keepdim=True))
+
     return exps / exps.sum(dim, keepdim=True)
 
 
@@ -247,10 +256,12 @@ def scaled_dot_product_attention(
     if mask is not None:
         scores = torch.where(mask, scores, -torch.inf)
 
+    # Multiply by values at float32 for precision (aggregation over a long sequence)
     scores = softmax(scores, dim=-1)
     out = einx.dot("... i j, ... j d -> ... i d", scores, values)
 
-    return out
+    # Return at the original datatype
+    return out.to(queries.dtype)
 
 
 class MultiHeadSelfAttention(nn.Module):
@@ -260,6 +271,7 @@ class MultiHeadSelfAttention(nn.Module):
         num_heads: int,
         rope: RotaryPositionEmbedding | None = None,
         device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
     ) -> None:
         """Constructs causal multi-head self-attention.
 
@@ -268,21 +280,25 @@ class MultiHeadSelfAttention(nn.Module):
             num_heads (int): Number of attention heads
             rope (RotaryPositionEmbedding | None, optional): RoPE module. Defaults to None.
             device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+            dtype (torch.dtype | None, optional): Data type of the parameters. Defaults to None.
         """
         super().__init__()
         self.num_heads = num_heads
         self.d_kv = d_model // num_heads
-        self.qkv = Linear(d_model, 3 * d_model, device=device)
-        self.out = Linear(d_model, d_model, device=device)
+        self.qkv = Linear(d_model, 3 * d_model, device=device, dtype=dtype)
+        self.out = Linear(d_model, d_model, device=device, dtype=dtype)
         self.rope = rope
 
-    def forward(self, x: Float[Tensor, "... seq_len d_model"]) -> Float[Tensor, "... seq_len d_model"]:
+    def forward(
+        self, x: Float[Tensor, "... seq_len d_model"], token_positions: Int[Tensor, " ... seq_len"] | None = None
+    ) -> Float[Tensor, "... seq_len d_model"]:
         """Applies multi-head self-attention to the input tensor.
 
         Args:
             x (Float[Tensor, "... seq_len d_model"]): Input tensor
+            token_positions (Int[Tensor, " ... seq_len"] | None, optional): Token positions.  Default to 0..seq_len-1.
         Returns:
-            _type_: Output tensor
+            Float[Tensor, "... seq_len d_model"]: Output tensor
         """
         seq_len = x.shape[-2]
         qkv = self.qkv(x)
@@ -292,7 +308,11 @@ class MultiHeadSelfAttention(nn.Module):
         q, k, v = qkv3.unbind(0)
 
         if self.rope:
-            pos = torch.arange(seq_len, device=q.device, dtype=torch.long)
+            pos = (
+                torch.arange(seq_len, device=q.device, dtype=torch.long)
+                if token_positions is None
+                else token_positions.squeeze()
+            )
             zeros = q.new_zeros(*q.shape[:-1], dtype=torch.long)
             token_positions = einx.add("... t, t -> ... t", zeros, pos, t=seq_len)
 
@@ -303,3 +323,45 @@ class MultiHeadSelfAttention(nn.Module):
         attention_out = scaled_dot_product_attention(q, k, v, mask)
         concat = einx.rearrange("... h t d -> ... t (h d)", attention_out, t=seq_len, h=self.num_heads, d=self.d_kv)
         return self.out(concat)
+
+
+class TransformerBlock(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        rope: RotaryPositionEmbedding,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> None:
+        """Constructs the pre-norm Transformer block.
+
+        Args:
+            d_model (int): Dimensionality of the Transformer block inputs
+            num_heads (int): Number of heads to use in multi-head self-attention
+            d_ff (int): Dimensionality of the position-wise feed-forward inner layer
+            rope (RotaryPositionEmbedding | None, optional): RoPE module. Defaults to None.
+            device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+            dtype (torch.dtype | None, optional): Data type of the parameters. Defaults to None.
+        """
+        super().__init__()
+        self.ln1 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.attn = MultiHeadSelfAttention(d_model, num_heads, rope, device=device, dtype=dtype)
+        self.ln2 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.ffn = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
+
+    def forward(
+        self, x: Float[Tensor, "... seq_len d_model"], token_positions: Int[Tensor, " ... seq_len"] | None = None
+    ) -> Float[Tensor, "... seq_len d_model"]:
+        """Applies the transformer block to the input tensor.
+
+        Args:
+            x (Float[Tensor, "... seq_len d_model"]): Input tensor
+            token_positions (Int[Tensor, " ... seq_len"] | None, optional): Token positions.  Default to 0..seq_len-1.
+        Returns:
+            Float[Tensor, "... seq_len d_model"]: Output tensor
+        """
+        y = x + self.attn(self.ln1(x), token_positions)
+        y = y + self.ffn(self.ln2(y))
+        return y
