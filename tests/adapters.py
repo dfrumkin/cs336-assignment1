@@ -17,6 +17,7 @@ from cs336_basics.model import (
     RotaryPositionEmbedding,
     SiLU,
     SwiGLU,
+    Transformer,
     TransformerBlock,
     scaled_dot_product_attention,
     softmax,
@@ -25,28 +26,68 @@ from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe import train_bpe
 
 
-def _load_linear_weights(linear, weights):
+def _load_linear_weights(linear: Linear, weights: Float[Tensor, " d_out d_in"]) -> None:
     linear.load_state_dict({"weights": weights})
 
 
-def _load_embedding_weights(embedding, weights):
+def _load_embedding_weights(embedding: Embedding, weights: Float[Tensor, " vocab_size d_model"]) -> None:
     embedding.load_state_dict({"embeddings": weights})
 
 
-def _load_swiglu_weights(swiglu, w1_weight, w2_weight, w3_weight):
+def _load_swiglu_weights(
+    swiglu: SwiGLU,
+    w1_weight: Float[Tensor, " d_ff d_model"],
+    w2_weight: Float[Tensor, " d_model d_ff"],
+    w3_weight: Float[Tensor, " d_ff d_model"],
+) -> None:
     swiglu.w1.load_state_dict({"weights": w1_weight})
     swiglu.w2.load_state_dict({"weights": w2_weight})
     swiglu.w3.load_state_dict({"weights": w3_weight})
 
 
-def _load_attn_weights(attn, q_proj_weight, k_proj_weight, v_proj_weight, o_proj_weight):
+def _load_attn_weights(
+    attn: MultiHeadSelfAttention,
+    q_proj_weight: Float[Tensor, " d_k d_in"],
+    k_proj_weight: Float[Tensor, " d_k d_in"],
+    v_proj_weight: Float[Tensor, " d_v d_in"],
+    o_proj_weight: Float[Tensor, " d_model d_v"],
+) -> None:
     qkv_proj_weight = torch.cat([q_proj_weight, k_proj_weight, v_proj_weight])
     _load_linear_weights(attn.qkv, qkv_proj_weight)
     _load_linear_weights(attn.out, o_proj_weight)
 
 
-def _load_rmsnorm_weights(rmsnorm, weights):
+def _load_rmsnorm_weights(rmsnorm, weights: Float[Tensor, " d_model"]) -> None:
     rmsnorm.load_state_dict({"gain": weights})
+
+
+def _load_transformer_block_weights(
+    transformer_block: TransformerBlock, weights: dict[str, Float[Tensor, ...]]
+) -> None:
+    _load_attn_weights(
+        transformer_block.attn,
+        weights["attn.q_proj.weight"],
+        weights["attn.k_proj.weight"],
+        weights["attn.v_proj.weight"],
+        weights["attn.output_proj.weight"],
+    )
+    _load_rmsnorm_weights(transformer_block.ln1, weights["ln1.weight"])
+    _load_swiglu_weights(
+        transformer_block.ffn, weights["ffn.w1.weight"], weights["ffn.w2.weight"], weights["ffn.w3.weight"]
+    )
+    _load_rmsnorm_weights(transformer_block.ln2, weights["ln2.weight"])
+
+
+def _load_transformer_weights(transformer: Transformer, weights: dict[str, Float[Tensor, ...]]) -> None:
+    _load_embedding_weights(transformer.embedding, weights["token_embeddings.weight"])
+    num_layers = len(weights) // 9  # embedding, norm, out + 9 per layer
+    for num_layer in range(num_layers):
+        prefix = f"layers.{num_layer}."
+        layer_weights = {k[len(prefix) :]: v for k, v in weights.items() if k.startswith(prefix)}
+        layer: TransformerBlock = transformer.layers[num_layer]  # type: ignore
+        _load_transformer_block_weights(layer, layer_weights)
+    _load_rmsnorm_weights(transformer.ln_final, weights["ln_final.weight"])
+    _load_linear_weights(transformer.lm_head, weights["lm_head.weight"])
 
 
 def run_linear(
@@ -318,20 +359,7 @@ def run_transformer_block(
     d_k = d_model // num_heads
     rope = RotaryPositionEmbedding(theta, d_k, max_seq_len)
     transformer_block = TransformerBlock(d_model, num_heads, d_ff, rope)
-
-    _load_attn_weights(
-        transformer_block.attn,
-        weights["attn.q_proj.weight"],
-        weights["attn.k_proj.weight"],
-        weights["attn.v_proj.weight"],
-        weights["attn.output_proj.weight"],
-    )
-    _load_rmsnorm_weights(transformer_block.ln1, weights["ln1.weight"])
-    _load_swiglu_weights(
-        transformer_block.ffn, weights["ffn.w1.weight"], weights["ffn.w2.weight"], weights["ffn.w3.weight"]
-    )
-    _load_rmsnorm_weights(transformer_block.ln2, weights["ln2.weight"])
-
+    _load_transformer_block_weights(transformer_block, weights)
     return transformer_block(in_features)
 
 
@@ -414,7 +442,17 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    transformer = Transformer(
+        d_model=d_model,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        rope_theta=rope_theta,
+        vocab_size=vocab_size,
+        context_length=context_length,
+        num_layers=num_layers,
+    )
+    _load_transformer_weights(transformer, weights)
+    return transformer(in_indices)
 
 
 def run_rmsnorm(

@@ -232,6 +232,7 @@ def softmax(x: Float[Tensor, "..."], dim: int) -> Float[Tensor, "..."]:
 
     exps = torch.exp(x - x.amax(dim, keepdim=True))
 
+    # Return in float32 for multiplication by values (stability - aggregating over a long sequence)
     return exps / exps.sum(dim, keepdim=True)
 
 
@@ -365,3 +366,59 @@ class TransformerBlock(nn.Module):
         y = x + self.attn(self.ln1(x), token_positions)
         y = y + self.ffn(self.ln2(y))
         return y
+
+
+class Transformer(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        rope_theta: float,
+        vocab_size: int,
+        context_length: int,
+        num_layers: int,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> None:
+        r"""Constructs the Transformer language mode.
+
+        Args:
+            d_model (int): The dimensionality of the model embeddings and sublayer outputs
+            num_heads (int): Number of heads to use in multi-headed attention. `d_model` must be
+                evenly divisible by `num_heads`.
+            d_ff (int): Dimensionality of the position-wise feed-forward inner layer
+            rope_theta (float): The RoPE $\Theta$ parameter
+            vocab_size (int): The number of unique items in the output vocabulary to be predicted
+            context_length (int): The maximum number of tokens to process at once
+            num_layers (int): The number of Transformer layers to use
+            device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+            dtype (torch.dtype | None, optional): Data type of the parameters. Defaults to None.
+        """
+        super().__init__()
+        self.embedding = Embedding(vocab_size, d_model, device=device, dtype=dtype)
+        d_k = d_model // num_heads
+        # Position embedding is done in float32 (for sin, cos precision), but returned in model datatype
+        rope = RotaryPositionEmbedding(rope_theta, d_k, context_length, device=device)
+        self.layers = nn.ModuleList(
+            [TransformerBlock(d_model, num_heads, d_ff, rope, device=device, dtype=dtype) for _ in range(num_layers)]
+        )
+        self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
+        self.lm_head = Linear(d_model, vocab_size)
+
+    def forward(self, in_indices: Int[Tensor, "batch_size seq_len"]) -> Float[Tensor, "batch_size seq_len vocab_size"]:
+        """Applies the transformer to token indices
+
+        Args:
+            in_indices: (Int[Tensor, "batch_size seq_len"]): Input token indices
+        Returns:
+            Float[Tensor, "batch_size seq_len vocab_size"]: For each input token returns
+                raw predicted logits over the vocabulary.
+        """
+        x = self.embedding(in_indices)
+
+        for layer in self.layers:
+            x = layer(x)
+
+        # Return in the model datatype
+        return self.lm_head(self.ln_final(x))
