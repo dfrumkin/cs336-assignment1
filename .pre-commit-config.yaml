@@ -10,3 +10,8 @@ repos:
       - id: ruff-format
         files: ^cs336_basics/.*\.py$
         exclude: ^cs336_basics/pretokenization_example\.py$
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.6.1
+    hooks:
+      - id: nbstripout
+
