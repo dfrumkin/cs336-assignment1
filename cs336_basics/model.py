@@ -5,6 +5,8 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor, nn
 
+from cs336_basics.nn_utils import softmax
+
 
 class Linear(nn.Module):
     def __init__(
@@ -215,25 +217,6 @@ class RotaryPositionEmbedding(nn.Module):
 
         # Return the result in the original dtype
         return y.to(in_dtype)
-
-
-def softmax(x: Float[Tensor, "..."], dim: int) -> Float[Tensor, "..."]:
-    """Applies softmax along the given dimension.
-
-    Args:
-        x (Float[Tensor, "..."]): Input tensor
-        dim (int): Dimension
-
-    Returns:
-        Float[Tensor, "..."]: Output tensor - always as float32
-    """
-    # Cast the input to float32 for exponentiation
-    x = x.to(torch.float32)
-
-    exps = torch.exp(x - x.amax(dim, keepdim=True))
-
-    # Return in float32 for multiplication by values (stability - aggregating over a long sequence)
-    return exps / exps.sum(dim, keepdim=True)
 
 
 def scaled_dot_product_attention(
