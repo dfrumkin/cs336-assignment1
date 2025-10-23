@@ -25,6 +25,7 @@ dependencies = [
     "pre-commit>=4.3.0",
     "nbdime>=4.0.2",
     "jupytext>=1.18.1",
+    "matplotlib>=3.10.7",
 ]
 
 [build-system]
