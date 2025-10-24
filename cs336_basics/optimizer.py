@@ -34,6 +34,7 @@ class AdamW(torch.optim.Optimizer):
         defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
         super().__init__(params, defaults)
 
+    @torch.no_grad()
     def step(self, closure: Callable[[], Float[Tensor, ""]] | None = None) -> Float[Tensor, ""] | None:
         """Performs an optimization step
 
@@ -45,38 +46,71 @@ class AdamW(torch.optim.Optimizer):
         """
         loss = None if closure is None else closure()
 
-        with torch.no_grad():
-            for group in self.param_groups:
-                for p in group["params"]:
-                    if p.grad is None:
-                        continue
+        for group in self.param_groups:
+            lr = group["lr"]
+            beta1, beta2 = group["betas"]
+            eps = group["eps"]
+            weight_decay = group["weight_decay"]
 
-                    lr = group["lr"]
-                    beta1, beta2 = group["betas"]
-                    eps = group["eps"]
-                    weight_decay = group["weight_decay"]
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
 
-                    grad = p.grad  # Gradient of loss with respect to p
-                    state = self.state[p]  # Get state associated with p.
+                grad = p.grad  # Gradient of loss with respect to p
+                state = self.state[p]  # Get state associated with p.
 
-                    if len(state) == 0:
-                        state["t"] = 1  # Iteration number starting from 1
-                        state["m"] = torch.zeros_like(p, dtype=torch.float32)  # First moment
-                        state["v"] = torch.zeros_like(p, dtype=torch.float32)  # Second moment
+                if len(state) == 0:
+                    state["t"] = 1  # Iteration number starting from 1
+                    state["m"] = torch.zeros_like(p, dtype=torch.float32)  # First moment
+                    state["v"] = torch.zeros_like(p, dtype=torch.float32)  # Second moment
 
-                    t = state["t"]
-                    m = state["m"]
-                    v = state["v"]
+                t = state["t"]
+                m = state["m"]
+                v = state["v"]
 
-                    # Moments
-                    m.mul_(beta1).add_(grad, alpha=1 - beta1)
-                    v.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+                # Moments
+                m.mul_(beta1).add_(grad, alpha=1 - beta1)
+                v.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
 
-                    # Adjust the learning rate
-                    lr_t = lr * math.sqrt(1 - beta2**t) / (1 - beta1**t)
+                # Adjust the learning rate
+                lr_t = lr * math.sqrt(1 - beta2**t) / (1 - beta1**t)
 
-                    # Update the parameters and apply weight decay
-                    p.addcdiv_(m, torch.sqrt(v) + eps, value=-lr_t).mul_(1 - lr * weight_decay)
+                # Update the parameters and apply weight decay
+                # Note: inplace operations automatically cast to the output type (e.g. float32 -> bfloat16)
+                p.addcdiv_(m, torch.sqrt(v) + eps, value=-lr_t).mul_(1 - lr * weight_decay)
 
-                    state["t"] = t + 1  # Increment iteration number.
+                state["t"] = t + 1  # Increment iteration number.
         return loss
+
+
+def get_lr_cosine_schedule(
+    it: int, max_learning_rate: float, min_learning_rate: float, warmup_iters: int, cosine_cycle_iters: int
+) -> float:
+    """
+    Given the parameters of a cosine learning rate decay schedule (with linear
+    warmup) and an iteration number, return the learning rate at the given
+    iteration under the specified schedule.
+
+    Args:
+        it (int): Iteration number to get learning rate for.
+        max_learning_rate (float): alpha_max, the maximum learning rate for
+            cosine learning rate schedule (with warmup).
+        min_learning_rate (float): alpha_min, the minimum / final learning rate for
+            the cosine learning rate schedule (with warmup).
+        warmup_iters (int): T_w, the number of iterations to linearly warm-up
+            the learning rate.
+        cosine_cycle_iters (int): T_c, the number of cosine annealing iterations.
+
+    Returns:
+        float: Learning rate at the given iteration under the specified schedule.
+    """
+    return (
+        it / warmup_iters * max_learning_rate
+        if it < warmup_iters
+        else min_learning_rate
+        + 0.5
+        * (1 + math.cos((it - warmup_iters) / (cosine_cycle_iters - warmup_iters) * math.pi))
+        * (max_learning_rate - min_learning_rate)
+        if warmup_iters <= it <= cosine_cycle_iters
+        else min_learning_rate
+    )

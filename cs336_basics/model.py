@@ -103,14 +103,14 @@ class RMSNorm(nn.Module):
 
 
 class SiLU(nn.Module):
-    def forward(self, x: Float[Tensor, "... d_model"]) -> Float[Tensor, "... d_model"]:
+    def forward(self, x: Float[Tensor, "... d_ff"]) -> Float[Tensor, "... d_ff"]:
         """Applies SiLU to the input tensor
 
         Args:
-            x (Float[Tensor, " ... d_model"]): Input tensor
+            x (Float[Tensor, " ... d_ff"]): Input tensor
 
         Returns:
-            Float[Tensor, "... d_model"]: Output tensor
+            Float[Tensor, "... d_ff"]: Output tensor
         """
         return x * torch.sigmoid(x)
 
