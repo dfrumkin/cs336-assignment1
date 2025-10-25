@@ -1,5 +1,5 @@
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 import torch
 from jaxtyping import Float
@@ -114,3 +114,27 @@ def get_lr_cosine_schedule(
         if warmup_iters <= it <= cosine_cycle_iters
         else min_learning_rate
     )
+
+
+@torch.no_grad()
+def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float, eps: float = 1e-6) -> None:
+    """Given a set of parameters, clip their combined gradients to have l2 norm at most max_l2_norm.
+
+    Args:
+        parameters (Iterable[torch.nn.Parameter]): collection of trainable parameters.
+        max_l2_norm (float): a positive value containing the maximum l2-norm.
+
+    The gradients of the parameters (parameter.grad) should be modified in-place.
+    """
+    grads = [p.grad for p in parameters if p.grad is not None]
+    if not grads:
+        return
+
+    # Compute global L2 norm
+    total_norm = torch.sqrt(sum(torch.sum(torch.square(g)) for g in grads))  # type: ignore[assignment]
+
+    # >= instead of > as requested, so "the resulting norm will be just under M".
+    if total_norm >= max_l2_norm:
+        scale = max_l2_norm / (total_norm + eps)
+        for g in grads:
+            g.mul_(scale)
