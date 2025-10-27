@@ -60,10 +60,11 @@ def calc_perplexity(loss: float) -> float:
     return math.exp(min(loss, 20))  # Avoid overflow in logging
 
 
-@main(config_path=".", config_name="config", version_base=None)
-def run(cfg: DictConfig):
+@main(config_path="conf", config_name="train", version_base=None)
+def run(cfg: DictConfig) -> None:
     # Instantiate and optionally compile the model
     model = instantiate(cfg.model)
+    model.to(cfg.device)
     if cfg.compile:
         model: nn.Module = torch.compile(model, backend="aot_eager" if cfg.device == "mps" else "inductor")  # type: ignore[assignment]
 
@@ -89,8 +90,7 @@ def run(cfg: DictConfig):
 
     # Load the dataset
     train_dataset = np.memmap(cfg.train_dataset, dtype=np.uint16, mode="r")
-    # valid_dataset = np.memmap(cfg.valid_dataset, dtype=np.uint16, mode="r")
-    valid_dataset = np.fromfile(cfg.valid_dataset, dtype=np.uint16)
+    valid_dataset = np.memmap(cfg.valid_dataset, dtype=np.uint16, mode="r")
 
     # Load the saved checkpoint
     if cfg.start_checkpoint is None:

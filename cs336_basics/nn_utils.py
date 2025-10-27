@@ -4,18 +4,22 @@ from jaxtyping import Float, Int
 from torch import Tensor
 
 
-def softmax(x: Float[Tensor, "..."], dim: int) -> Float[Tensor, "..."]:
+def softmax(x: Float[Tensor, "..."], dim: int, temp: float | None = None) -> Float[Tensor, "..."]:
     """Applies softmax along the given dimension.
 
     Args:
         x (Float[Tensor, "..."]): Input tensor
         dim (int): Dimension
+        temp (float | None, optional): Temperature.  Defaults to None.
 
     Returns:
         Float[Tensor, "..."]: Output tensor - always as float32
     """
     # Cast the input to float32 for exponentiation
     x = x.to(torch.float32)
+
+    if temp is not None:
+        x = x / temp
 
     exps = torch.exp(x - x.amax(dim, keepdim=True))
 

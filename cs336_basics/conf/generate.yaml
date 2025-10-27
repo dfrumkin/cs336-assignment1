@@ -1,0 +1,23 @@
+defaults:
+  - model: small
+  - _self_
+
+device: mps
+checkpoint: checkpoints/test/best.ckpt
+prompt: "\n"
+
+tokenizer:
+  _target_: cs336_basics.tokenizer.Tokenizer.from_files
+  vocab_filepath: data/tiny_train_vocab.pkl
+  merges_filepath: data/tiny_train_merges.pkl
+
+decode:
+  max_new_tokens: 512
+  temperature: 0.5
+  top_p: 0.8
+
+# Disable Hydra logging
+hydra:
+  run:
+    dir: .                # Don’t create outputs/<date>/<time>/
+  output_subdir: null     # Don’t create .hydra/
