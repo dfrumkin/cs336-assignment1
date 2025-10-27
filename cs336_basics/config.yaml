@@ -1,0 +1,69 @@
+project: cs336-2025-a1
+run_name: test  #??  # Provide at runtime
+
+device: mps
+compile: true  # TODO
+total_tokens_processed: 40_960_000  # MPS
+# total_tokens_processed: 327_680_000  # TinyStories
+batch_size: 32  # 250  # TinySories
+context_length: 256  # TinyStories
+lr: 3e-4
+train_logging_freq: 10
+val_logging_freq: 200
+
+wandb_id: null  # Set if continuing
+start_checkpoint: null  # Set if continuing
+checkpoint_dir: checkpoints/${run_name}
+last_checkpoint: ${checkpoint_dir}/last.ckpt
+best_checkpoint: ${checkpoint_dir}/best.ckpt
+
+train_dataset: data/TinyStoriesV2-GPT4-train_tiny.tokens
+valid_dataset: data/TinyStoriesV2-GPT4-valid_tiny.tokens
+
+get_batch:
+  _target_: cs336_basics.data.get_batch
+  _partial_: true
+  batch_size: ${batch_size}
+  context_length: ${context_length} 
+  device: ${device}
+
+model:
+  _target_: cs336_basics.model.Transformer
+  d_model: 512
+  num_heads: 16
+  d_ff: 1344
+  rope_theta: 10000
+  vocab_size: 10000  # TinyStories
+  context_length: ${context_length}
+  num_layers: 4
+  device: ${device}
+
+grad_clipping:
+  _target_: cs336_basics.optimizer.gradient_clipping
+  _partial_: true
+  max_l2_norm: 1.0
+  eps: 1e-6
+
+optimizer:
+  _target_: cs336_basics.optimizer.AdamW
+  params: ??
+  lr: ${lr}  # Not used, gets overwritten by scheduler
+  betas: [0.9, 0.95]
+  eps: 1e-8
+  weight_decay: 1e-2
+
+scheduler:
+  _target_: cs336_basics.optimizer.get_lr_cosine_schedule
+  _partial_: true
+  max_learning_rate: ${lr}
+  min_learning_rate: 3e-6
+  warmup_iters: ??
+  cosine_cycle_iters: ??
+
+# Disable Hydra logging: we already have W&B for that
+hydra:
+  run:
+    dir: .               # Don’t create outputs/<date>/<time>/
+  output_subdir: null     # Don’t create .hydra/
+  job_logging: none       # Don’t write train.log
+  hydra_logging: none     # Don’t write hydra.log

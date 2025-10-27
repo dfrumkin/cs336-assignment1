@@ -1,3 +1,12 @@
+# Wandb outputs
+wandb/
+
+# Checkpoints
+checkpoints/
+
+# Data
+data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

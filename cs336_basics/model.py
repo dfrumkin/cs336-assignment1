@@ -303,7 +303,7 @@ class MultiHeadSelfAttention(nn.Module):
             q = self.rope(q, token_positions)
             k = self.rope(k, token_positions)
 
-        mask = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool))
+        mask = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool, device=q.device))
         attention_out = scaled_dot_product_attention(q, k, v, mask)
         concat = einx.rearrange("... h t d -> ... t (h d)", attention_out, t=seq_len, h=self.num_heads, d=self.d_kv)
         return self.out(concat)
@@ -387,7 +387,7 @@ class Transformer(nn.Module):
             [TransformerBlock(d_model, num_heads, d_ff, rope, device=device, dtype=dtype) for _ in range(num_layers)]
         )
         self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
-        self.lm_head = Linear(d_model, vocab_size)
+        self.lm_head = Linear(d_model, vocab_size, device=device, dtype=dtype)
 
     def forward(self, in_indices: Int[Tensor, "batch_size seq_len"]) -> Float[Tensor, "batch_size seq_len vocab_size"]:
         """Applies the transformer to token indices
