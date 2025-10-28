@@ -9,4 +9,4 @@ model:
   vocab_size: 10000  # TinyStories
   context_length: 256
   num_layers: 4
-  device: ${device}
+  device: ??

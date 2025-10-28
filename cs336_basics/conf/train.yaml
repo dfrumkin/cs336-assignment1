@@ -5,12 +5,11 @@ defaults:
 project: cs336-2025-a1
 run_name: test  #??  # Provide at runtime
 
-device: mps
 compile: true
-total_tokens_processed: 40_960_000  # MPS
-# total_tokens_processed: 327_680_000  # TinyStories
+# total_tokens_processed: 40_960_000  # MPS
+total_tokens_processed: 327_680_000  # TinyStories
 context_length: ${model.context_length}
-batch_size: 32  # 250  # TinySories
+batch_size: 32  # TinySories
 lr: 3e-4
 train_logging_freq: 10
 val_logging_freq: 200
@@ -29,7 +28,7 @@ get_batch:
   _partial_: true
   batch_size: ${batch_size}
   context_length: ${context_length} 
-  device: ${device}
+  device: ??
 
 grad_clipping:
   _target_: cs336_basics.optimizer.gradient_clipping

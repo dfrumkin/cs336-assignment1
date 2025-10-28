@@ -62,14 +62,17 @@ def calc_perplexity(loss: float) -> float:
 
 @main(config_path="conf", config_name="train", version_base=None)
 def run(cfg: DictConfig) -> None:
+    # Get device
+    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+
     # Instantiate and optionally compile the model
-    model = instantiate(cfg.model)
-    model.to(cfg.device)
+    model = instantiate(cfg.model, device=device)
+    model.to(device)
     if cfg.compile:
-        model: nn.Module = torch.compile(model, backend="aot_eager" if cfg.device == "mps" else "inductor")  # type: ignore[assignment]
+        model: nn.Module = torch.compile(model, backend="aot_eager" if device == "mps" else "inductor")  # type: ignore[assignment]
 
     # Reduce precision for speed (works only on cuda)
-    if torch.device(cfg.device).type == "cuda":
+    if device == "cuda":
         torch.set_float32_matmul_precision("high")
 
     # Compute num steps
@@ -84,7 +87,7 @@ def run(cfg: DictConfig) -> None:
     scheduler_fn = instantiate(cfg.scheduler, warmup_iters=warmup_iters, cosine_cycle_iters=cosine_cycle_iters)
 
     # Other instantiations
-    get_batch_fn = instantiate(cfg.get_batch)
+    get_batch_fn = instantiate(cfg.get_batch, device=device)
     grad_clipping_fn = instantiate(cfg.grad_clipping)
     optimizer = instantiate(cfg.optimizer, params=model.parameters())
 

@@ -50,7 +50,8 @@ def run(cfg: DictConfig) -> None:
     tokenizer = instantiate(cfg.tokenizer)
     model = instantiate(cfg.model)
     load_checkpoint(cfg.checkpoint, model)
-    model.to(cfg.device)
+    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    model.to(device)
     # model.eval() is not needed
 
     continuation = decode(model, tokenizer, prompt=cfg.prompt, context_length=cfg.model.context_length, **cfg.decode)
