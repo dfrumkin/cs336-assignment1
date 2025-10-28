@@ -182,12 +182,12 @@ class RotaryPositionEmbedding(nn.Module):
         self.register_buffer("cos_sin", cos_sin, persistent=False)
 
     def forward(
-        self, x: Float[Tensor, " ... seq_len d_k"], token_positions: Int[Tensor, " ... seq_len"]
-    ) -> Float[Tensor, " ... seq_len d_k"]:
+        self, x: Float[Tensor, " ... head seq_len d_k"], token_positions: Int[Tensor, " ... seq_len"]
+    ) -> Float[Tensor, " ... head seq_len d_k"]:
         """Applies RoPE to the input tensor.
 
         Args:
-            x (Float[Tensor, " ... seq_len d_k"]): Input tensor
+            x (Float[Tensor, " ... head seq_len d_k"]): Input tensor
             token_positions (Int[Tensor, " ... seq_len"]): Token positions.
 
         Returns:
@@ -204,7 +204,7 @@ class RotaryPositionEmbedding(nn.Module):
         x2: Float[Tensor, "... seq_len n 2"] = einx.rearrange("... l (n p) -> ... l n p", x, p=2)  # type: ignore[assignment]
 
         # Multiply by cosines and sines (outer product)
-        prods = einx.multiply("... l n p, ... l n q -> ... l n p q", x2, cos_sin, p=2, q=2)
+        prods = einx.multiply("... h l n p, ... l n q -> ... h l n p q", x2, cos_sin, p=2, q=2)
 
         # Combine into rotated components
         y_even = prods[..., 0, 0] - prods[..., 1, 1]
@@ -292,13 +292,14 @@ class MultiHeadSelfAttention(nn.Module):
         q, k, v = qkv3.unbind(0)
 
         if self.rope:
-            pos = (
+            token_positions = (
                 torch.arange(seq_len, device=q.device, dtype=torch.long)
                 if token_positions is None
                 else token_positions.squeeze()
             )
-            zeros = q.new_zeros(*q.shape[:-1], dtype=torch.long)
-            token_positions = einx.add("... t, t -> ... t", zeros, pos, t=seq_len)
+            if len(token_positions.shape) == 1:
+                # Same for every sequence in the batch
+                token_positions = token_positions.expand(x.shape[0], -1)
 
             q = self.rope(q, token_positions)
             k = self.rope(k, token_positions)
