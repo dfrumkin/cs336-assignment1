@@ -1,4 +1,6 @@
 defaults:
+  - hydra/job_logging: disabled
+  - hydra/hydra_logging: disabled
   - model: small
   - _self_
 
@@ -57,5 +59,3 @@ hydra:
   run:
     dir: .                # Don’t create outputs/<date>/<time>/
   output_subdir: null     # Don’t create .hydra/
-  job_logging: disabled   # Don’t write train.log
-  hydra_logging: disabled # Don’t write hydra.log
