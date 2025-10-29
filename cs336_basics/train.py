@@ -20,6 +20,11 @@ warnings.filterwarnings(
     "ignore",
     message="Skipping serialization of skipfiles_inline_module_allowlist",
 )
+warnings.filterwarnings(
+    "ignore",
+    message="The given NumPy array is not writable",
+    category=UserWarning,
+)
 
 
 @torch.no_grad()

@@ -21,7 +21,7 @@ def save_checkpoint(
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model,
             optimizer, and iteration to.
     """
-    obj = {"model": model.to("cpu").state_dict(), "optimizer": optimizer.state_dict(), "iteration": iteration}
+    obj = {"model": model.state_dict(), "optimizer": optimizer.state_dict(), "iteration": iteration}
     torch.save(obj, out)
 
 
