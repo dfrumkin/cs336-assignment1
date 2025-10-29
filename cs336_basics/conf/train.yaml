@@ -57,5 +57,5 @@ hydra:
   run:
     dir: .                # Don’t create outputs/<date>/<time>/
   output_subdir: null     # Don’t create .hydra/
-  job_logging: none       # Don’t write train.log
-  hydra_logging: none     # Don’t write hydra.log
+  job_logging: null       # Don’t write train.log
+  hydra_logging: null     # Don’t write hydra.log
