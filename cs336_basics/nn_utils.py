@@ -41,7 +41,7 @@ def cross_entropy(logits: Float[Tensor, "... num_classes"], targets: Int[Tensor,
     logits = logits.to(torch.float32)
 
     # Predictions at targets
-    z_y = einx.get_at("... [c], ... -> ...", logits, targets)
+    z_y = einx.get_at("... [c], ... -> ...", logits, targets.to(torch.int64))
 
     # Log-sum-exp
     max_vals = logits.amax(dim=-1, keepdim=True)

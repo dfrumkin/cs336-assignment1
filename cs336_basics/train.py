@@ -33,7 +33,7 @@ def evaluate(
         available = min(dataset.shape[0] - start, n_tokens_block)
         batch_iter = available // (context_length + 1)
         n_tokens_iter = batch_iter * (context_length + 1)
-        flat = dataset[start : start + n_tokens_iter].astype(np.int32)
+        flat = dataset[start : start + n_tokens_iter]
         block_flat = torch.from_numpy(flat).to(device, non_blocking=True)
         block: Int[torch.Tensor, "b t"] = einx.rearrange(
             "(b t) -> b t",
