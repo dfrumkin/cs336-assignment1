@@ -1,8 +1,8 @@
 defaults:
-  - override hydra/job_logging: disabled
-  - override hydra/hydra_logging: disabled
   - model: small
   - _self_
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
 
 project: cs336-2025-a1
 run_name: test  #??  # Provide at runtime
