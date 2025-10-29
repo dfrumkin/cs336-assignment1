@@ -2,7 +2,6 @@ defaults:
   - model: small
   - _self_
 
-device: mps
 checkpoint: checkpoints/test/best.ckpt
 prompt: "\n"
 
