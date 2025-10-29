@@ -1,6 +1,6 @@
 defaults:
-  - hydra/job_logging: disabled
-  - hydra/hydra_logging: disabled
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
   - model: small
   - _self_
 
