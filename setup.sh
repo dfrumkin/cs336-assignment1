@@ -3,9 +3,8 @@
 set -euo pipefail
 
 if ! command -v uv >/dev/null 2>&1; then
-  echo "Error: 'uv' is not installed or not on PATH." >&2
-  echo "Install from https://github.com/astral-sh/uv and re-run this script." >&2
-  exit 1
+  echo "==> Installing uv..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
 
 echo "==> Syncing environment with uv..."
