@@ -25,7 +25,6 @@ def evaluate(
     total_loss = 0
     total_tokens = 0
     n_tokens_block = batch_size * (context_length + 1)
-    do_upcast = device == "mps"
 
     # total number of iterations (for tqdm progress bar)
     n_iters = math.ceil((dataset.shape[0] - context_length) / n_tokens_block)
@@ -34,10 +33,7 @@ def evaluate(
         available = min(dataset.shape[0] - start, n_tokens_block)
         batch_iter = available // (context_length + 1)
         n_tokens_iter = batch_iter * (context_length + 1)
-        flat = dataset[start : start + n_tokens_iter]
-        if do_upcast:
-            # MPS does not work with uint16, or even int16.
-            flat = flat.astype(np.int32)
+        flat = dataset[start : start + n_tokens_iter].astype(np.int32)
         block_flat = torch.from_numpy(flat).to(device, non_blocking=True)
         block: Int[torch.Tensor, "b t"] = einx.rearrange(
             "(b t) -> b t",
