@@ -48,7 +48,7 @@ scheduler:
   _target_: cs336_basics.optimizer.get_lr_cosine_schedule
   _partial_: true
   max_learning_rate: ${lr}
-  min_learning_rate: 3e-6
+  min_learning_rate: 0  # 3e-6
   warmup_iters: ??
   cosine_cycle_iters: ??
 
