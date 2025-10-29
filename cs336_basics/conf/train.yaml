@@ -14,7 +14,7 @@ context_length: ${model.context_length}
 batch_size: 32  # TinySories
 lr: 3e-4
 train_logging_freq: 10
-val_logging_freq: 200
+val_logging_freq: 1000  # 200
 
 wandb_id: null  # Set if continuing
 start_checkpoint: null  # Set if continuing
