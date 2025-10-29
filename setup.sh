@@ -11,6 +11,9 @@ fi
 echo "==> Syncing environment with uv..."
 uv sync
 
+echo "==> Activating the environment..."
+source .venv/bin/activate
+
 echo "==> Enabling nbdime Git integration..."
 nbdime config-git --enable
 
