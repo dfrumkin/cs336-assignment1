@@ -128,18 +128,22 @@ def run(cfg: DictConfig) -> None:
     # Log in to WnB using WANDB_API_KEY or ~/.netrc
     wandb.login()
 
+    # Initializations
+    best_loss = float("inf")
+    best_step = -1
+    run_name = cfg.run_name  # Or smth else for sweeps
+    run_ckpt_dir = Path(cfg.checkpoint_dir) / run_name
+    last_checkpoint = run_ckpt_dir / "last.ckpt"
+    best_checkpoint = run_ckpt_dir / "best.ckpt"
+
     # Initialize WnB
     wandb.init(
         project=cfg.project,
-        name=cfg.run_name,
+        name=run_name,
         config=OmegaConf.to_container(cfg, resolve=True),  # type: ignore
         id=cfg.wandb_id,
         resume=resume,
     )
-
-    # Init the best result
-    best_loss = float("inf")
-    best_step = -1
 
     with tqdm(total=num_steps, initial=start_step, desc="Training") as pbar:
         for step in range(start_step, num_steps):
@@ -183,14 +187,13 @@ def run(cfg: DictConfig) -> None:
                     step=step,
                 )
 
-                path = Path(cfg.last_checkpoint)
-                path.parent.mkdir(parents=True, exist_ok=True)
-                save_checkpoint(model, optimizer, step, cfg.last_checkpoint)
+                run_ckpt_dir.mkdir(parents=True, exist_ok=True)
+                save_checkpoint(model, optimizer, step, last_checkpoint)
 
                 if val_loss < best_loss:
                     best_loss = val_loss
                     best_step = step
-                    save_checkpoint(model, optimizer, step, cfg.best_checkpoint)
+                    save_checkpoint(model, optimizer, step, best_checkpoint)
 
             # Update tqdm
             pbar.update()

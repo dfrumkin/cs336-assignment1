@@ -18,9 +18,7 @@ val_logging_freq: 1000  # 200
 
 wandb_id: null  # Set if continuing
 start_checkpoint: null  # Set if continuing
-checkpoint_dir: checkpoints/${run_name}
-last_checkpoint: ${checkpoint_dir}/last.ckpt
-best_checkpoint: ${checkpoint_dir}/best.ckpt
+checkpoint_dir: checkpoints
 
 train_dataset: data/TinyStoriesV2-GPT4-train_tiny.tokens
 valid_dataset: data/TinyStoriesV2-GPT4-valid_tiny.tokens
