@@ -1,4 +1,5 @@
 import math
+import warnings
 from pathlib import Path
 
 import einx
@@ -14,6 +15,11 @@ from tqdm import tqdm
 import wandb
 from cs336_basics.nn_utils import cross_entropy
 from cs336_basics.serialization import load_checkpoint, save_checkpoint
+
+warnings.filterwarnings(
+    "ignore",
+    message="Skipping serialization of skipfiles_inline_module_allowlist",
+)
 
 
 @torch.no_grad()
