@@ -92,7 +92,7 @@ def test_params(model, msg):
         if torch.isnan(p).any() or torch.isinf(p).any():
             bad_params.append(n)
         if p.grad is not None:
-            gmax = p.grad.abs().max().item()
+            gmax = p.grad.abs().max()
             if torch.isnan(gmax).any() or torch.isinf(gmax).any():
                 bad_grads.append(n)
 
