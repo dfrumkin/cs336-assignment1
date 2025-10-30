@@ -266,7 +266,7 @@ def scaled_dot_product_attention(
     scores = einx.dot("b ... i d, b ... j d -> b ... i j", queries, keys) / math.sqrt(keys.shape[-1])
 
     if mask is not None:
-        scores = torch.where(mask, scores, -torch.inf)
+        scores = scores.masked_fill(~mask, float("-inf"))
 
     scores = softmax(scores, dim=-1).to(values.dtype)
     return einx.dot("... i j, ... j d -> ... i d", scores, values)
