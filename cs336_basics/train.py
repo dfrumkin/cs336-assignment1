@@ -194,7 +194,7 @@ def run(cfg: DictConfig) -> None:
                 )
 
             # Validation and checkpointing - less frequent
-            if (step + 1) % cfg.val_logging_freq == 0:
+            if (step + 1) % cfg.val_logging_freq == 0 or step + 1 == num_steps:
                 val_loss = evaluate(model, valid_dataset, cfg.batch_size, cfg.context_length, device, dtype)
                 wandb.log(
                     {"loss/val": val_loss, "perplexity/val": calc_perplexity(val_loss)},
