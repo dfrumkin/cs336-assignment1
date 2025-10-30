@@ -102,17 +102,16 @@ class RMSNorm(nn.Module):
         return result.to(in_dtype)
 
 
-class SiLU(nn.Module):
-    def forward(self, x: Float[Tensor, "... d_ff"]) -> Float[Tensor, "... d_ff"]:
-        """Applies SiLU to the input tensor
+def silu(x: Float[Tensor, "... d_ff"]) -> Float[Tensor, "... d_ff"]:
+    """Applies SiLU to the input tensor
 
-        Args:
-            x (Float[Tensor, " ... d_ff"]): Input tensor
+    Args:
+        x (Float[Tensor, " ... d_ff"]): Input tensor
 
-        Returns:
-            Float[Tensor, "... d_ff"]: Output tensor
-        """
-        return x * torch.sigmoid(x)
+    Returns:
+        Float[Tensor, "... d_ff"]: Output tensor
+    """
+    return x * torch.sigmoid(x)
 
 
 class SwiGLU(nn.Module):
@@ -134,7 +133,6 @@ class SwiGLU(nn.Module):
         super().__init__()
         if d_ff is None:
             d_ff = int(((d_model * 8 / 3 + 32) // 64) * 64)
-        self.silu = SiLU()
         self.w1 = Linear(d_model, d_ff, device, dtype)
         self.w2 = Linear(d_ff, d_model, device, dtype)
         self.w3 = Linear(d_model, d_ff, device, dtype)
@@ -148,10 +146,10 @@ class SwiGLU(nn.Module):
         Returns:
             Float[Tensor, "... d_model"]: Output tensor
         """
-        return self.w2(self.silu(self.w1(x)) * self.w3(x))
+        return self.w2(silu(self.w1(x)) * self.w3(x))
 
 
-class SiLUFFN(nn.Module):
+class SiLU(nn.Module):
     def __init__(
         self,
         d_model: int,
@@ -170,7 +168,6 @@ class SiLUFFN(nn.Module):
         super().__init__()
         if d_ff is None:
             d_ff = int(((d_model * 4 + 32) // 64) * 64)
-        self.silu = SiLU()
         self.w1 = Linear(d_model, d_ff, device, dtype)
         self.w2 = Linear(d_ff, d_model, device, dtype)
 
@@ -183,7 +180,7 @@ class SiLUFFN(nn.Module):
         Returns:
             Float[Tensor, "... d_model"]: Output tensor
         """
-        return self.w2(self.silu(self.w1(x)))
+        return self.w2(silu(self.w1(x)))
 
 
 class RotaryPositionEmbedding(nn.Module):
@@ -229,6 +226,7 @@ class RotaryPositionEmbedding(nn.Module):
             Float[Tensor, " ... seq_len d_k"]: Output tensor
         """
         # Select relevant rotations
+        assert token_positions.max() < self.cos_sin.shape[0]
         cos_sin = einx.get_at("[l] n p, ... i -> ... i n p", self.cos_sin, token_positions, p=2)
 
         # Split into pairs (n == d_k / 2)

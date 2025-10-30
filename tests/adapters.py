@@ -16,11 +16,11 @@ from cs336_basics.model import (
     MultiHeadSelfAttention,
     RMSNorm,
     RotaryPositionEmbedding,
-    SiLU,
     SwiGLU,
     Transformer,
     TransformerBlock,
     scaled_dot_product_attention,
+    silu,
 )
 from cs336_basics.nn_utils import cross_entropy, softmax
 from cs336_basics.optimizer import AdamW, get_lr_cosine_schedule, gradient_clipping
@@ -494,7 +494,6 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    silu = SiLU()
     return silu(in_features)
 
 
