@@ -193,7 +193,7 @@ def run(cfg: DictConfig) -> None:
             test_weights(model, f"clipping {step}")
 
             # Set the learning rate for the current step
-            lr = scheduler_fn(step)
+            lr = scheduler_fn(step + 1)
             for group in optimizer.param_groups:
                 group["lr"] = lr
 

@@ -78,7 +78,7 @@ class AdamW(torch.optim.Optimizer):
                 lr_t = lr * (bc2**0.5) / bc1
 
                 # update in fp32
-                denom = v.clamp_(min=0).sqrt().add_(eps)
+                denom = v.clamp(min=0).sqrt().add_(eps)
                 upd32 = m / denom
 
                 # decoupled weight decay
