@@ -98,9 +98,11 @@ def test_params(model, msg):
 
     if bad_params:
         print(f"{msg}: NaNs/Infs found in parameters:", bad_params)
+        raise AssertionError
 
     if bad_grads:
         print(f"{msg}: NaNs/Infs found in gradients:", bad_grads)
+        raise AssertionError
 
     if not (bad_params or bad_grads):
         print(f"{msg}: Parameters/gradients are finite.")
