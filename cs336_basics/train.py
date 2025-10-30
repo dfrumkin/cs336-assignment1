@@ -1,5 +1,4 @@
 import math
-import random
 import warnings
 from pathlib import Path
 
@@ -26,15 +25,6 @@ warnings.filterwarnings(
     message="The given NumPy array is not writable",
     category=UserWarning,
 )
-
-
-def fix_random(seed: int = 42):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
 
 @torch.no_grad()
@@ -86,9 +76,6 @@ def calc_perplexity(loss: float) -> float:
 
 @main(config_path="conf", config_name="train", version_base=None)
 def run(cfg: DictConfig) -> None:
-    # Fix randomness
-    fix_random()
-
     # Get device
     device = torch.device(
         "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
