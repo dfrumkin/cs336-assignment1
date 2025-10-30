@@ -26,7 +26,7 @@ def get_batch(
     """
     starts = np.random.randint(0, dataset.shape[0] - context_length, size=batch_size)
     idx = starts[:, None] + np.arange(context_length + 1)
-    block = dataset[idx]
+    block = dataset[idx].astype(np.int32)
     batch = torch.from_numpy(block).to(device)
     x = batch[:, :context_length]
     y = batch[:, 1 : context_length + 1]

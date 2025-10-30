@@ -65,7 +65,7 @@ class Embedding(nn.Module):
         Returns:
             Float[Tensor, "... d_model"]: Token embedding vectors
         """
-        return einx.get_at("[num_embeddings] d_model, ... -> ... d_model", self.embeddings, token_ids.to(torch.int64))
+        return einx.get_at("[num_embeddings] d_model, ... -> ... d_model", self.embeddings, token_ids)
 
 
 class RMSNorm(nn.Module):
