@@ -39,7 +39,12 @@ def fix_random(seed: int = 42):
 
 @torch.no_grad()
 def evaluate(
-    model: nn.Module, dataset: Int[np.ndarray, "*"], batch_size: int, context_length: int, device: str
+    model: nn.Module,
+    dataset: Int[np.ndarray, "*"],
+    batch_size: int,
+    context_length: int,
+    device: torch.device,
+    dtype: torch.dtype | None,
 ) -> float:
     # No need for model.eval() because our model does not need it
 
@@ -63,10 +68,12 @@ def evaluate(
             t=context_length + 1,
         )  # type: ignore[assignment]
         inputs = block[:, :-1]
-        logits = model(inputs)
         targets = block[:, 1:]
 
-        loss = cross_entropy(logits, targets)
+        with torch.autocast(device_type=device.type, dtype=dtype):
+            logits = model(inputs)
+            loss = cross_entropy(logits, targets)
+
         total_loss += loss.item() * batch_iter * context_length
         total_tokens += batch_iter * context_length
 
@@ -83,17 +90,23 @@ def run(cfg: DictConfig) -> None:
     fix_random()
 
     # Get device
-    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-
-    # Instantiate and optionally compile the model
-    model = instantiate(cfg.model, device=device)
-    model.to(device)
-    if cfg.compile:
-        model: nn.Module = torch.compile(model, backend="aot_eager" if device == "mps" else "inductor")  # type: ignore[assignment]
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    )
 
     # Reduce precision for speed (works only on cuda)
-    if device == "cuda":
+    if device.type == "cuda":
         torch.set_float32_matmul_precision("high")
+        if cfg.mixed_precision:
+            dtype = torch.bfloat16
+    else:
+        dtype = None
+
+    # Instantiate and optionally compile the model
+    model = instantiate(cfg.model, device=device, dtype=dtype)
+    model.to(device)
+    if cfg.compile:
+        model: nn.Module = torch.compile(model, backend="aot_eager" if device.type == "mps" else "inductor")  # type: ignore[assignment]
 
     # Compute num steps
     num_steps = (
@@ -154,8 +167,9 @@ def run(cfg: DictConfig) -> None:
             optimizer.zero_grad()
 
             # Forward pass
-            logits = model(inputs)
-            loss = cross_entropy(logits, targets)
+            with torch.autocast(device_type=device.type, dtype=dtype):
+                logits = model(inputs)
+                loss = cross_entropy(logits, targets)
 
             # Backward pass
             loss.backward()
@@ -181,7 +195,7 @@ def run(cfg: DictConfig) -> None:
 
             # Validation and checkpointing - less frequent
             if (step + 1) % cfg.val_logging_freq == 0:
-                val_loss = evaluate(model, valid_dataset, cfg.batch_size, cfg.context_length, device)
+                val_loss = evaluate(model, valid_dataset, cfg.batch_size, cfg.context_length, device, dtype)
                 wandb.log(
                     {"loss/val": val_loss, "perplexity/val": calc_perplexity(val_loss)},
                     step=step,

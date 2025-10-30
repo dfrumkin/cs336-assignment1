@@ -228,10 +228,6 @@ class RotaryPositionEmbedding(nn.Module):
         Returns:
             Float[Tensor, " ... seq_len d_k"]: Output tensor
         """
-        # Cast the input to float32
-        in_dtype = x.dtype
-        x = x.to(torch.float32)
-
         # Select relevant rotations
         cos_sin = einx.get_at("[l] n p, ... i -> ... i n p", self.cos_sin, token_positions, p=2)
 
@@ -250,8 +246,7 @@ class RotaryPositionEmbedding(nn.Module):
             "... l n p -> ... l (n p)", torch.stack([y_even, y_odd], dim=-1), p=2
         )  # type: ignore[assignment]
 
-        # Return the result in the original dtype
-        return y.to(in_dtype)
+        return y
 
 
 def scaled_dot_product_attention(
@@ -275,12 +270,8 @@ def scaled_dot_product_attention(
     if mask is not None:
         scores = torch.where(mask, scores, -torch.inf)
 
-    # Multiply by values at float32 for precision (aggregation over a long sequence)
-    scores = softmax(scores, dim=-1)
-    out = einx.dot("... i j, ... j d -> ... i d", scores, values)
-
-    # Return at the original datatype
-    return out.to(queries.dtype)
+    scores = softmax(scores, dim=-1).to(values.dtype)
+    return einx.dot("... i j, ... j d -> ... i d", scores, values)
 
 
 class MultiHeadSelfAttention(nn.Module):
@@ -421,7 +412,7 @@ class Transformer(nn.Module):
         super().__init__()
         self.embedding = Embedding(vocab_size, d_model, device=device, dtype=dtype)
         d_k = d_model // num_heads
-        # Position embedding is done in float32 (for sin, cos precision), but returned in model datatype
+
         rope = RotaryPositionEmbedding(rope_theta, d_k, context_length, device=device)
         self.layers = nn.ModuleList(
             [TransformerBlock(d_model, num_heads, d_ff, rope, device=device, dtype=dtype) for _ in range(num_layers)]

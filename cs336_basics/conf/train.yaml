@@ -16,6 +16,8 @@ lr: 3e-4
 train_logging_freq: 10
 val_logging_freq: 1000  # 200
 
+mixed_precision: true
+
 wandb_id: null  # Set if continuing
 start_checkpoint: null  # Set if continuing
 checkpoint_dir: checkpoints

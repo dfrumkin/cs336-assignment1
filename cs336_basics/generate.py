@@ -12,7 +12,7 @@ from cs336_basics.tokenizer import Tokenizer
 END_OF_TEXT = "<|endoftext|>"
 
 
-@torch.no_grad()
+@torch.inference_mode()
 def decode(
     model: Transformer,
     tokenizer: Tokenizer,
@@ -48,7 +48,9 @@ def decode(
 
 @main(config_path="conf", config_name="generate", version_base=None)
 def run(cfg: DictConfig) -> None:
-    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    )
 
     tokenizer = instantiate(cfg.tokenizer)
     model = instantiate(cfg.model, device=device)
