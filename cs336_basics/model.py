@@ -140,7 +140,7 @@ class SwiGLU(nn.Module):
         self.w3 = Linear(d_model, d_ff, device, dtype)
 
     def forward(self, x: Float[Tensor, "... d_model"]) -> Float[Tensor, "... d_model"]:
-        """Applies SwiGLU to the input tensor
+        """Applies the SwiGLU FFN to the input tensor
 
         Args:
             x (Float[Tensor, " ... d_model"]): Input tensor
@@ -149,6 +149,41 @@ class SwiGLU(nn.Module):
             Float[Tensor, "... d_model"]: Output tensor
         """
         return self.w2(self.silu(self.w1(x)) * self.w3(x))
+
+
+class SiLUFFN(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        d_ff: int | None = None,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> None:
+        """Constructs a SiLU FFN.
+
+        Args:
+            d_model (int): Hidden dimension of the model
+            d_ff (int | None, optional): _description_. Defaults to approximately 8/3*d_model.
+            device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+            dtype (torch.dtype | None, optional): Data type of the parameters. Defaults to None.
+        """
+        super().__init__()
+        if d_ff is None:
+            d_ff = int(((d_model * 4 + 32) // 64) * 64)
+        self.silu = SiLU()
+        self.w1 = Linear(d_model, d_ff, device, dtype)
+        self.w2 = Linear(d_ff, d_model, device, dtype)
+
+    def forward(self, x: Float[Tensor, "... d_model"]) -> Float[Tensor, "... d_model"]:
+        """Applies the SwiGLU FFN to the input tensor
+
+        Args:
+            x (Float[Tensor, " ... d_model"]): Input tensor
+
+        Returns:
+            Float[Tensor, "... d_model"]: Output tensor
+        """
+        return self.w2(self.silu(self.w1(x)))
 
 
 class RotaryPositionEmbedding(nn.Module):
