@@ -95,12 +95,11 @@ def run(cfg: DictConfig) -> None:
     )
 
     # Reduce precision for speed (works only on cuda)
+    dtype = None
     if device.type == "cuda":
         torch.set_float32_matmul_precision("high")
         if cfg.mixed_precision:
             dtype = torch.bfloat16
-    else:
-        dtype = None
 
     # Instantiate and optionally compile the model
     model = instantiate(cfg.model, device=device, dtype=dtype)
