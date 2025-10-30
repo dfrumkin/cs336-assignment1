@@ -84,13 +84,13 @@ def calc_perplexity(loss: float) -> float:
     return math.exp(min(loss, 20))  # Avoid overflow in logging
 
 
-def test_weights(model):
+def test_weights(model, msg):
     bad = [n for n, p in model.named_parameters() if torch.isnan(p).any() or torch.isinf(p).any()]
 
     if bad:
-        print("NaNs found in:", bad)
+        print(f"{msg}: NaNs found in:", bad)
     else:
-        print("All parameters are finite.")
+        print(f"{msg}: All parameters are finite.")
 
 
 @main(config_path="conf", config_name="train", version_base=None)
@@ -180,7 +180,7 @@ def run(cfg: DictConfig) -> None:
                 loss = cross_entropy(logits, targets)
 
             # Are all parameters finite?
-            test_weights(model)
+            test_weights(model, f"forward {step}")
 
             # Backward pass
             loss.backward()
@@ -189,6 +189,9 @@ def run(cfg: DictConfig) -> None:
             if grad_clipping_fn is not None:
                 grad_clipping_fn(model.parameters())
 
+            # Are all parameters finite?
+            test_weights(model, f"clipping {step}")
+
             # Set the learning rate for the current step
             lr = scheduler_fn(step)
             for group in optimizer.param_groups:
@@ -196,6 +199,9 @@ def run(cfg: DictConfig) -> None:
 
             # Optimizer step
             optimizer.step()
+
+            # Are all parameters finite?
+            test_weights(model, f"optimizer {step}")
 
             # Log training loss and learning rate
             if (step + 1) % cfg.train_logging_freq == 0:
