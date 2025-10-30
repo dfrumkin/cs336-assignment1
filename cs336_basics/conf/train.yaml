@@ -57,5 +57,8 @@ scheduler:
 # Disable Hydra logging: we already have W&B for that
 hydra:
   run:
-    dir: .                # Don’t create outputs/<date>/<time>/
-  output_subdir: null     # Don’t create .hydra/
+    dir: .               # Don’t create outputs/<date>/<time>/
+  sweep:
+    dir: .               # Run all jobs in the current directory
+    subdir: .            # Don’t create subdirectories per job
+  output_subdir: null    # Don’t create .hydra/
