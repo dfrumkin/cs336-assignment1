@@ -36,7 +36,7 @@ class AdamW(torch.optim.Optimizer):
 
     @torch.no_grad()
     def step(self, closure: Callable[[], Float[Tensor, ""]] | None = None) -> Float[Tensor, ""] | None:
-        """Performs an optimization step
+        """Performs an optimization step.
 
         Args:
             closure (Callable[[], Float[Tensor, ""]] | None, optional): Closure for computing the loss.
@@ -50,13 +50,13 @@ class AdamW(torch.optim.Optimizer):
             lr = group["lr"]
             beta1, beta2 = group["betas"]
             eps = group["eps"]
-            weight_decay = group["weight_decay"]
+            wd = group["weight_decay"]
 
             for p in group["params"]:
                 if p.grad is None:
                     continue
 
-                grad = p.grad  # Gradient of loss with respect to p
+                grad = p.grad.detach().to(torch.float32)  # Gradient of loss with respect to p
                 state = self.state[p]  # Get state associated with p.
 
                 if len(state) == 0:
@@ -72,12 +72,21 @@ class AdamW(torch.optim.Optimizer):
                 m.mul_(beta1).add_(grad, alpha=1 - beta1)
                 v.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
 
-                # Adjust the learning rate
-                lr_t = lr * math.sqrt(1 - beta2**t) / (1 - beta1**t)
+                # bias-corrected step size (fp32 on same device)
+                bc1 = 1.0 - beta1**t
+                bc2 = 1.0 - beta2**t
+                lr_t = lr * (bc2**0.5) / bc1
 
-                # Update the parameters and apply weight decay
-                # Note: inplace operations automatically cast to the output type (e.g. float32 -> bfloat16)
-                p.addcdiv_(m, torch.sqrt(v) + eps, value=-lr_t).mul_(1 - lr * weight_decay)
+                # update in fp32
+                denom = v.clamp_(min=0).sqrt().add_(eps)
+                upd32 = m / denom
+
+                # decoupled weight decay
+                if wd != 0:
+                    p.add_(p, alpha=-lr * wd)  # in param dtype
+
+                # apply update (cast once to param dtype)
+                p.add_(upd32.to(dtype=p.dtype), alpha=-lr_t)
 
                 state["t"] = t + 1  # Increment iteration number.
         return loss
