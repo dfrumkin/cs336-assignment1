@@ -8,6 +8,8 @@ project: cs336-2025-a1
 run_name: test  #??  # Provide at runtime
 
 compile: true
+mixed_precision: true
+
 # total_tokens_processed: 40_960_000  # MPS
 total_tokens_processed: 327_680_000  # TinyStories
 context_length: ${model.context_length}
@@ -15,8 +17,6 @@ batch_size: 32  # TinySories
 lr: 2e-3
 train_logging_freq: 10
 val_logging_freq: 1000  # 200
-
-mixed_precision: true
 
 wandb_id: null  # Set if continuing
 start_checkpoint: null  # Set if continuing
