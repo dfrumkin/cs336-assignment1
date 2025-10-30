@@ -84,6 +84,15 @@ def calc_perplexity(loss: float) -> float:
     return math.exp(min(loss, 20))  # Avoid overflow in logging
 
 
+def test_weights(model):
+    bad = [n for n, p in model.named_parameters() if torch.isnan(p).any() or torch.isinf(p).any()]
+
+    if bad:
+        print("NaNs found in:", bad)
+    else:
+        print("All parameters are finite.")
+
+
 @main(config_path="conf", config_name="train", version_base=None)
 def run(cfg: DictConfig) -> None:
     # Fix randomness
@@ -169,6 +178,9 @@ def run(cfg: DictConfig) -> None:
             with torch.autocast(device_type=device.type, dtype=dtype):
                 logits = model(inputs)
                 loss = cross_entropy(logits, targets)
+
+            # Are all parameters finite?
+            test_weights(model)
 
             # Backward pass
             loss.backward()
