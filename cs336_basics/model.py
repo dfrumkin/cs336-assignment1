@@ -175,7 +175,7 @@ class SiLUFFN(nn.Module):
         self.w2 = Linear(d_ff, d_model, device, dtype)
 
     def forward(self, x: Float[Tensor, "... d_model"]) -> Float[Tensor, "... d_model"]:
-        """Applies the SwiGLU FFN to the input tensor
+        """Applies the SiLU FFN to the input tensor
 
         Args:
             x (Float[Tensor, " ... d_model"]): Input tensor
@@ -382,8 +382,12 @@ class TransformerBlock(nn.Module):
         Returns:
             Float[Tensor, "... seq_len d_model"]: Output tensor
         """
+        # Pre-norm
         y = x + self.attn(self.ln1(x), token_positions)
         y = y + self.ffn(self.ln2(y))
+        # Post-norm
+        # y = self.ln1(x + self.attn(x), token_positions)
+        # y = self.ln2(y + self.ffn(y))
         return y
 
 
@@ -422,6 +426,7 @@ class Transformer(nn.Module):
         self.layers = nn.ModuleList(
             [TransformerBlock(d_model, num_heads, d_ff, rope, device=device, dtype=dtype) for _ in range(num_layers)]
         )
+        # Pre-norm
         self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
         self.lm_head = Linear(d_model, vocab_size, device=device, dtype=dtype)
 
@@ -440,4 +445,7 @@ class Transformer(nn.Module):
             x = layer(x)
 
         # Return in the model datatype
+        # Pre-norm
         return self.lm_head(self.ln_final(x))
+        # Post-norm
+        # return self.lm_head(x)
