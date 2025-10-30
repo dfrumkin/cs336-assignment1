@@ -226,7 +226,6 @@ class RotaryPositionEmbedding(nn.Module):
             Float[Tensor, " ... seq_len d_k"]: Output tensor
         """
         # Select relevant rotations
-        assert token_positions.max() < self.cos_sin.shape[0]
         cos_sin = einx.get_at("[l] n p, ... i -> ... i n p", self.cos_sin, token_positions, p=2)
 
         # Split into pairs (n == d_k / 2)

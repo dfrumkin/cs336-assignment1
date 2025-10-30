@@ -163,7 +163,7 @@ def run(cfg: DictConfig) -> None:
             inputs, targets = get_batch_fn(train_dataset)
 
             # Reset the gradients
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
             # Forward pass
             with torch.autocast(device_type=device.type, dtype=dtype):
