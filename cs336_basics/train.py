@@ -84,13 +84,26 @@ def calc_perplexity(loss: float) -> float:
     return math.exp(min(loss, 20))  # Avoid overflow in logging
 
 
-def test_weights(model, msg):
-    bad = [n for n, p in model.named_parameters() if torch.isnan(p).any() or torch.isinf(p).any()]
+def test_params(model, msg):
+    bad_params = []
+    bad_grads = []
 
-    if bad:
-        print(f"{msg}: NaNs found in:", bad)
-    else:
-        print(f"{msg}: All parameters are finite.")
+    for n, p in model.named_parameters():
+        if torch.isnan(p).any() or torch.isinf(p).any():
+            bad_params.append(n)
+        if p.grad is not None:
+            gmax = p.grad.abs().max().item()
+            if torch.isnan(gmax).any() or torch.isinf(gmax).any():
+                bad_grads.append(n)
+
+    if bad_params:
+        print(f"{msg}: NaNs/Infs found in parameters:", bad_params)
+
+    if bad_grads:
+        print(f"{msg}: NaNs/Infs found in gradients:", bad_grads)
+
+    if not (bad_params or bad_grads):
+        print(f"{msg}: Parameters/gradients are finite.")
 
 
 @main(config_path="conf", config_name="train", version_base=None)
@@ -180,17 +193,20 @@ def run(cfg: DictConfig) -> None:
                 loss = cross_entropy(logits, targets)
 
             # Are all parameters finite?
-            test_weights(model, f"forward {step}")
+            test_params(model, f"forward {step}")
 
             # Backward pass
             loss.backward()
+
+            # Are all parameters finite?
+            test_params(model, f"backward {step}")
 
             # Apply gradient clipping
             if grad_clipping_fn is not None:
                 grad_clipping_fn(model.parameters())
 
             # Are all parameters finite?
-            test_weights(model, f"clipping {step}")
+            test_params(model, f"clipping {step}")
 
             # Set the learning rate for the current step
             lr = scheduler_fn(step + 1)
@@ -201,7 +217,7 @@ def run(cfg: DictConfig) -> None:
             optimizer.step()
 
             # Are all parameters finite?
-            test_weights(model, f"optimizer {step}")
+            test_params(model, f"optimizer {step}")
 
             # Log training loss and learning rate
             if (step + 1) % cfg.train_logging_freq == 0:
