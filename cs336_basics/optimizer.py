@@ -130,11 +130,10 @@ def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: flo
     if not grads:
         return
 
-    # Compute global L2 norm
-    total_norm = torch.sqrt(sum(torch.sum(torch.square(g)) for g in grads))  # type: ignore[assignment]
+    # Compute global L2 norm using torch.linalg.vector_norm for stability
+    total_norm = torch.linalg.vector_norm(torch.stack([torch.linalg.vector_norm(g.detach()) for g in grads]))
 
-    # >= instead of > as requested, so "the resulting norm will be just under M".
-    if total_norm >= max_l2_norm:
-        scale = max_l2_norm / (total_norm + eps)
+    scale = max_l2_norm / (total_norm + eps)
+    if scale < 1.0:
         for g in grads:
             g.mul_(scale)
