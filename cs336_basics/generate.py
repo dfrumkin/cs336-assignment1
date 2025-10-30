@@ -24,8 +24,9 @@ def decode(
 ) -> str:
     end_token = tokenizer.encode(END_OF_TEXT)[0]
     tokens = tokenizer.encode(prompt)
-    for i in range(max_new_tokens):
-        in_tokens = torch.tensor(tokens[i : i + context_length])[None]
+    for _ in range(max_new_tokens):
+        seq_start = max(len(tokens) - context_length, 0)
+        in_tokens = torch.tensor(tokens[seq_start : len(tokens)])[None]
         logits = model(in_tokens)[0, -1, :]
         probs = softmax(logits, dim=0, temp=temperature)
 
@@ -47,10 +48,11 @@ def decode(
 
 @main(config_path="conf", config_name="generate", version_base=None)
 def run(cfg: DictConfig) -> None:
-    tokenizer = instantiate(cfg.tokenizer)
-    model = instantiate(cfg.model)
-    load_checkpoint(cfg.checkpoint, model)
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+
+    tokenizer = instantiate(cfg.tokenizer)
+    model = instantiate(cfg.model, device=device)
+    load_checkpoint(cfg.checkpoint, model)
     model.to(device)
     # model.eval() is not needed
 
