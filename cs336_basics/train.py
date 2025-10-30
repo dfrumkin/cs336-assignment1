@@ -89,11 +89,11 @@ def test_params(model, msg):
     bad_grads = []
 
     for n, p in model.named_parameters():
-        if torch.isnan(p).any() or torch.isinf(p).any():
+        if not torch.isfinite(p).all():
             bad_params.append(n)
         if p.grad is not None:
             gmax = p.grad.abs().max()
-            if torch.isnan(gmax).any() or torch.isinf(gmax).any():
+            if not torch.isfinite(gmax).all():
                 bad_grads.append(n)
 
     if bad_params:
