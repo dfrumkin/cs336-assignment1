@@ -8,15 +8,15 @@ project: cs336-2025-a1
 run_name: test  #??  # Provide at runtime
 
 compile: true
-mixed_precision: true
+mixed_precision: false
 
 # total_tokens_processed: 40_960_000  # MPS
 total_tokens_processed: 327_680_000  # TinyStories
 context_length: ${model.context_length}
-batch_size: 32  # TinySories
-lr: 2e-3
+batch_size: 128  # TinySories
+lr: 4e-3
 train_logging_freq: 10
-val_logging_freq: 1000  # 200
+val_logging_freq: 1000
 
 wandb_id: null  # Set if continuing
 start_checkpoint: null  # Set if continuing
@@ -49,8 +49,8 @@ optimizer:
 scheduler:
   _target_: cs336_basics.optimizer.get_lr_cosine_schedule
   _partial_: true
-  max_learning_rate: ${lr}
-  min_learning_rate: 2e-5
+  max_learning_rate: ??
+  min_learning_rate: ??
   warmup_iters: ??
   cosine_cycle_iters: ??
 
