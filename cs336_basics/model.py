@@ -310,7 +310,7 @@ class MultiHeadSelfAttention(nn.Module):
         """
         seq_len = x.shape[-2]
         qkv = self.qkv(x)
-        qkv3: Float[Tensor, "3 ... num_heads seq_len d_model"] = einx.rearrange(
+        qkv3: Float[Tensor, "3 ... num_heads seq_len d"] = einx.rearrange(
             "... t (three h d) -> three ... h t d", qkv, three=3, h=self.num_heads, t=seq_len, d=self.d_kv
         )  # type: ignore
         q, k, v = qkv3.unbind(0)
