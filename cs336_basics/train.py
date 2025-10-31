@@ -142,7 +142,13 @@ def run(cfg: DictConfig) -> None:
     # Standard parameters for a one-cycle cosine annealing
     warmup_iters = max(100, round(0.02 * num_steps))
     cosine_cycle_iters = num_steps - warmup_iters  # single decay, no restarts
-    scheduler_fn = instantiate(cfg.scheduler, warmup_iters=warmup_iters, cosine_cycle_iters=cosine_cycle_iters)
+    scheduler_fn = instantiate(
+        cfg.scheduler,
+        warmup_iters=warmup_iters,
+        max_learning_rate=cfg.lr,
+        min_learning_rate=0.01 * cfg.lr,
+        cosine_cycle_iters=cosine_cycle_iters,
+    )
 
     # Other instantiations
     get_batch_fn = instantiate(cfg.get_batch, device=device)
