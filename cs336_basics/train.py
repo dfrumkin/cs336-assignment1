@@ -72,7 +72,7 @@ def evaluate(
 
         with torch.autocast(device_type=device.type, dtype=dtype, enabled=dtype is not None):
             logits = model(inputs)
-            loss = cross_entropy(logits, targets)
+        loss = cross_entropy(logits, targets)
 
         total_loss += loss.item() * batch_iter * context_length
         total_tokens += batch_iter * context_length
@@ -167,6 +167,7 @@ def run(cfg: DictConfig) -> None:
     wandb.login()
 
     # Initializations
+    total_loss = 0.0
     best_loss = float("inf")
     best_step = -1
     run_name = cfg.run_name  # Or smth else for sweeps
@@ -194,7 +195,8 @@ def run(cfg: DictConfig) -> None:
             # Forward pass
             with torch.autocast(device_type=device.type, dtype=dtype, enabled=dtype is not None):
                 logits = model(inputs)
-                loss = cross_entropy(logits, targets)
+            loss = cross_entropy(logits, targets)
+            total_loss += loss.item()
 
             # Are all parameters finite?
             # test_params(model, f"forward {step}")
@@ -225,8 +227,14 @@ def run(cfg: DictConfig) -> None:
 
             # Log training loss and learning rate
             if (step + 1) % cfg.train_logging_freq == 0:
+                avg_loss = total_loss / cfg.train_logging_freq
+                total_loss = 0.0
                 wandb.log(
-                    {"loss/train": loss.item(), "perplexity/train": calc_perplexity(loss.item()), "lr": lr},
+                    {
+                        "loss/train": avg_loss,
+                        "perplexity/train": calc_perplexity(avg_loss),
+                        "lr": lr,
+                    },
                     step=step,
                 )
 
