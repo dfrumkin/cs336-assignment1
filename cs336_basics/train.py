@@ -70,7 +70,7 @@ def evaluate(
         inputs = block[:, :-1]
         targets = block[:, 1:]
 
-        with torch.autocast(device_type=device.type, dtype=dtype):
+        with torch.autocast(device_type=device.type, dtype=dtype, enabled=dtype is not None):
             logits = model(inputs)
             loss = cross_entropy(logits, targets)
 
@@ -129,7 +129,9 @@ def run(cfg: DictConfig) -> None:
     model = instantiate(cfg.model, device=device, dtype=dtype)
     model.to(device)
     if cfg.compile:
-        model: nn.Module = torch.compile(model, backend="aot_eager" if device.type == "mps" else "inductor")  # type: ignore[assignment]
+        # Got numerical problems when compiling on CUDA with mixed precision... :(
+        backend = "aot_eager" if device.type == "mps" or cfg.mixed_precision else "inductor"
+        model: nn.Module = torch.compile(model, backend=backend)  # type: ignore[assignment]
 
     # Compute num steps
     num_steps = (
@@ -190,25 +192,25 @@ def run(cfg: DictConfig) -> None:
             optimizer.zero_grad(set_to_none=True)
 
             # Forward pass
-            with torch.autocast(device_type=device.type, dtype=dtype):
+            with torch.autocast(device_type=device.type, dtype=dtype, enabled=dtype is not None):
                 logits = model(inputs)
                 loss = cross_entropy(logits, targets)
 
             # Are all parameters finite?
-            test_params(model, f"forward {step}")
+            # test_params(model, f"forward {step}")
 
             # Backward pass
             loss.backward()
 
             # Are all parameters finite?
-            test_params(model, f"backward {step}")
+            # test_params(model, f"backward {step}")
 
             # Apply gradient clipping
             if grad_clipping_fn is not None:
                 grad_clipping_fn(model.parameters())
 
             # Are all parameters finite?
-            test_params(model, f"clipping {step}")
+            # test_params(model, f"clipping {step}")
 
             # Set the learning rate for the current step
             lr = scheduler_fn(step + 1)
@@ -219,7 +221,7 @@ def run(cfg: DictConfig) -> None:
             optimizer.step()
 
             # Are all parameters finite?
-            test_params(model, f"optimizer {step}")
+            # test_params(model, f"optimizer {step}")
 
             # Log training loss and learning rate
             if (step + 1) % cfg.train_logging_freq == 0:
