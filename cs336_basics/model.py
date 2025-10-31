@@ -187,7 +187,14 @@ class SiLU(nn.Module):
 class RotaryPositionEmbedding(nn.Module):
     cos_sin: Float[Tensor, "l n 2"]
 
-    def __init__(self, theta: float, d_k: int, max_seq_len: int, device: torch.device | None = None) -> None:
+    def __init__(
+        self,
+        theta: float,
+        d_k: int,
+        max_seq_len: int,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> None:
         """Constructs the RoPE module.
 
         Args:
@@ -195,6 +202,7 @@ class RotaryPositionEmbedding(nn.Module):
             d_k (int): Dimension of query and key vectors
             max_seq_len (int): Maximum sequence length that will be inputted
             device (torch.device | None, optional): Device to store the parameters on. Defaults to None.
+            dtype (torch.dtype | None, optional): Data type of the parameters. Defaults to None.
         """
         super().__init__()
 
@@ -212,7 +220,7 @@ class RotaryPositionEmbedding(nn.Module):
         cos_sin = torch.stack([angles.cos(), angles.sin()], dim=-1)
 
         # Register as buffer (not trainable and not part of state_dict)
-        self.register_buffer("cos_sin", cos_sin, persistent=False)
+        self.register_buffer("cos_sin", cos_sin.to(dtype), persistent=False)
 
     def forward(
         self, x: Float[Tensor, " ... head seq_len d_k"], token_positions: Int[Tensor, " ... seq_len"]
@@ -317,9 +325,7 @@ class MultiHeadSelfAttention(nn.Module):
 
         if self.rope:
             token_positions = (
-                torch.arange(seq_len, device=q.device, dtype=torch.long)
-                if token_positions is None
-                else token_positions.squeeze()
+                torch.arange(seq_len, device=q.device) if token_positions is None else token_positions.squeeze()
             )
             if len(token_positions.shape) == 1:
                 # Same for every sequence in the batch
@@ -411,7 +417,7 @@ class Transformer(nn.Module):
         self.embedding = Embedding(vocab_size, d_model, device=device, dtype=dtype)
         d_k = d_model // num_heads
 
-        rope = RotaryPositionEmbedding(rope_theta, d_k, context_length, device=device)
+        rope = RotaryPositionEmbedding(rope_theta, d_k, context_length, device=device, dtype=dtype)
         self.layers = nn.ModuleList(
             [TransformerBlock(d_model, num_heads, d_ff, rope, device=device, dtype=dtype) for _ in range(num_layers)]
         )
