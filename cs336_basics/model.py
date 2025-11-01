@@ -381,7 +381,7 @@ class TransformerBlock(nn.Module):
         y = x + self.attn(self.ln1(x), token_positions)
         y = y + self.ffn(self.ln2(y))
         # Post-norm
-        # y = self.ln1(x + self.attn(x), token_positions)
+        # y = self.ln1(x + self.attn(x, token_positions))
         # y = self.ln2(y + self.ffn(y))
         return y
 
