@@ -365,6 +365,8 @@ class TransformerBlock(nn.Module):
         self.attn = MultiHeadSelfAttention(d_model, num_heads, rope, device=device, dtype=dtype)
         self.ln2 = RMSNorm(d_model, device=device, dtype=dtype)
         self.ffn = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
+        # SiLU - remember to adjust d_ff
+        # self.ffn = SiLU(d_model, d_ff, device=device, dtype=dtype)
 
     def forward(
         self, x: Float[Tensor, "... seq_len d_model"], token_positions: Int[Tensor, " ... seq_len"] | None = None
