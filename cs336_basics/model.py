@@ -346,7 +346,7 @@ class TransformerBlock(nn.Module):
         d_model: int,
         num_heads: int,
         d_ff: int,
-        rope: RotaryPositionEmbedding,
+        rope: RotaryPositionEmbedding | None = None,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
