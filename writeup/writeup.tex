@@ -357,7 +357,7 @@ For experiment tracking, I have used:
 
 I started by getting code to run on a Macbook Air (M4) - \href{https://wandb.ai/dmitry-frumkin-personal/cs336-2025-a1/runs/i4pbgawu}{run} with typical uncalibrated parameter values, achieving the validation error of 1.9.  Then I switched to H-100, using \href{https://lambda.ai/}{lambda.ai} to rent a GPU.  The \href{https://wandb.ai/dmitry-frumkin-personal/cs336-2025-a1/runs/9rgiiuvg}{initial run} achieved the validation error of 1.465.  The time for all runs on H100 was 25-30 minutes with compiled models.  
 
-When compiling with mixed precision (bfloat16), I got numeric issues (NaNs) in the attention block.  Using "aot\_eager" compilation with bfloat16 resulted in much slower training and higher losses (\href{run}{https://wandb.ai/dmitry-frumkin-personal/cs336-2025-a1/runs/57g77up1}).  I carefully reviewed and debugged my code, but in the end had to skip mixed precision while still using "inductor" compilation on CUDA.
+When compiling with mixed precision (bfloat16), I got numeric issues (NaNs) in the attention block.  Using "aot\_eager" compilation with bfloat16 resulted in much slower training and higher losses (\href{https://wandb.ai/dmitry-frumkin-personal/cs336-2025-a1/runs/57g77up1}{run}).  I carefully reviewed and debugged my code, but in the end had to skip mixed precision while still using "inductor" compilation on CUDA.
 
 \subsection{TinyStories}
 
