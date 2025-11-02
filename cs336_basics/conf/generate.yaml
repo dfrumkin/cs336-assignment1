@@ -9,6 +9,9 @@ tokenizer:
   _target_: cs336_basics.tokenizer.Tokenizer.from_files
   vocab_filepath: data/tiny_train_vocab.pkl
   merges_filepath: data/tiny_train_merges.pkl
+  # owt
+  vocab_filepath: data/owt_train_vocab.pkl
+  merges_filepath: data/owt_train_merges.pkl
 
 decode:
   max_new_tokens: 512
