@@ -24,6 +24,9 @@ checkpoint_dir: checkpoints
 
 train_dataset: data/TinyStoriesV2-GPT4-train_tiny.tokens
 valid_dataset: data/TinyStoriesV2-GPT4-valid_tiny.tokens
+# OWT
+# train_dataset: data/owt_train_owt.tokens
+# valid_dataset: data/owt_valid_owt.tokens
 
 get_batch:
   _target_: cs336_basics.data.get_batch
