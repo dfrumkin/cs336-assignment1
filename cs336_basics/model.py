@@ -427,6 +427,9 @@ class Transformer(nn.Module):
         self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
         self.lm_head = Linear(d_model, vocab_size, device=device, dtype=dtype)
 
+        # Weight tying
+        # self.lm_head.weights = self.embedding.embeddings
+
     def forward(self, in_indices: Int[Tensor, "batch_size seq_len"]) -> Float[Tensor, "batch_size seq_len vocab_size"]:
         """Applies the transformer to token indices
 
