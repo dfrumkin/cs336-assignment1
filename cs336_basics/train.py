@@ -161,7 +161,7 @@ def run(cfg: DictConfig) -> None:
         {"params": others, "weight_decay": 0.1},
         {"params": embedding, "weight_decay": 0.0},
     ]
-    optimizer = instantiate(cfg.optimizer, params)
+    optimizer = instantiate(cfg.optimizer, params=params)
 
     # Load the dataset
     train_dataset = np.memmap(cfg.train_dataset, dtype=np.uint16, mode="r")
