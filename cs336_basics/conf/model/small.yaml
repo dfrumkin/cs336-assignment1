@@ -7,6 +7,7 @@ model:
   d_ff: 1344  # 2048 for SiLU
   rope_theta: 10000
   vocab_size: 10000  # TinyStories
+  # vocab_size: 32000  # OWT
   context_length: 256
   num_layers: 4
   device: ??
