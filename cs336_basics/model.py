@@ -55,9 +55,8 @@ class Embedding(nn.Module):
         """
         super().__init__()
         self.embeddings = nn.Parameter(torch.empty((num_embeddings, embedding_dim), dtype=dtype, device=device))
-        # For tied weights
-        # std=1.0 / math.sqrt(embedding_dim)
-        std = 1.0
+        # Weight tying
+        std = 1.0 / math.sqrt(embedding_dim)
         nn.init.trunc_normal_(self.embeddings, 0.0, std, -3.0, 3.0)
 
     def forward(self, token_ids: Int[Tensor, " ..."]) -> Float[Tensor, "... d_model"]:

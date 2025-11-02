@@ -153,7 +153,15 @@ def run(cfg: DictConfig) -> None:
     # Other instantiations
     get_batch_fn = instantiate(cfg.get_batch, device=device)
     grad_clipping_fn = instantiate(cfg.grad_clipping)
-    optimizer = instantiate(cfg.optimizer, params=model.parameters())
+
+    # Optimizer - no weight decay on embedding
+    embedding = [model.embedding.embeddings]  # type: ignore
+    others = [p for p in model.parameters() if p not in embedding]
+    params = [
+        {"params": others, "weight_decay": 0.1},
+        {"params": embedding, "weight_decay": 0.0},
+    ]
+    optimizer = instantiate(cfg.optimizer, params)
 
     # Load the dataset
     train_dataset = np.memmap(cfg.train_dataset, dtype=np.uint16, mode="r")
