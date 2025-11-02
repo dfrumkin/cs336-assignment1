@@ -43,6 +43,7 @@ grad_clipping:
 
 optimizer:
   _target_: cs336_basics.optimizer.AdamW
+  _convert_: all
   params: ??
   lr: ${lr}  # Not used, gets overwritten by scheduler
   betas: [0.9, 0.95]
