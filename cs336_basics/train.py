@@ -156,7 +156,7 @@ def run(cfg: DictConfig) -> None:
 
     # Optimizer - no weight decay on embedding
     embedding = [model.embedding.embeddings]  # type: ignore
-    others = [p for p in model.parameters() if p not in embedding]
+    others = [p for p in model.parameters() if p is not embedding]
     params = [
         {"params": others, "weight_decay": 0.1},
         {"params": embedding, "weight_decay": 0.0},
