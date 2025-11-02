@@ -490,6 +490,10 @@ With the best parameters found so far (batch size 128, learning rate 4e-3), remo
     \includegraphics[width=1\linewidth]{images/nope.png}
 \end{figure}
 
+Without positional encoding the loss expectedly went up, but not too high (1.400 vs. 1.343).
+The model still manages to learn some positional information because of masking.
+It also makes use of statistical structure of the data (even without order) to make intelligent guesses about the next token.
+
 \subsubsection*{SwiGLU vs. SiLU}
 
 \begin{figure}[H]
@@ -503,7 +507,50 @@ and in our toy example it does not matter what to use as long as the number of p
 
 \subsection{Running on OpenWebText}
 
-\textbf{TODO}
+I got a much higher final validation loss: 3.96 vs. 1.343 on TinyStories.  With a much larger vocabulary (32,000 vs 10,000 tokens), the task is significantly harder, so the larger loss is not surprising.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{images/small_model_owt.png}
+\end{figure}
+
+Here is sample text generated from the prompt "I think I did it again":
+
+\begin{quote}
+I think I did it again've been playing some of the best games of my career, but it's not about as much as I can. I'm still playing a lot of different games.
+
+I've been playing several different games in different parts of the world, and I've played that games in a different way. I've been playing a lot for a long time 
+and I've been playing a lot.
+
+The first game I played was a little bit of a bit of a game. I played it for a while, but I've been playing it for years now.
+
+It's been a long time since I started playing games, and I think I'm ready to play it. I'm not very confident in playing this game.
+
+I think I have a lot of experience with my career. I think I've been playing the same game and I think it's a really interesting experience.
+
+"I've always been in the games where I can play and I've always been a part of it.
+
+"I've always been in the most difficult part of it. I've always been the most productive part of my life, and I'm still a great player. I always want to be a part
+of it.
+
+"I was so much focused on that. I was like, 'I'm a very good player.'
+
+"I've always been a big part of it. I think I'm a little bit older and I'm a little older and I feel like I've had a lot of time and I feel like I can play a lot 
+of different games and then I'm going to have a lot of different things to say.
+
+"I'm very good at it. I like to play and I love to play. I think I like it."
+
+He's playing the same game as the others. He's got a lot of different things with it. He's always been a great player and a great player. He's a really good 
+player and he's always kind of the same, but I think he's one of the most valuable players in the game. He's been a great player and he's not the same as me. He's
+a very good player and he's been great, I'm a great player, I can be a great player and I have great players who can make a great player.
+
+"He's a great player and I like him. He's a good
+\end{quote}
+
+The text looks like English, but is not very coherent.  The transition from the prompt is bad.  
+In addition to the original 4e-3, I tried the learning rates of 1e-2 and 1e-3 without much success.
+Perhaps, we could get a minor improvement with more learning rate and batch size fine-tuning; however, the complexity of the text and the much larger vocabulary
+would likely require a much longer training with a longer context and a larger model to get decent results.
 
 \subsection{Your own modification + leaderboard}
 

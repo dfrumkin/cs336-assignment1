@@ -1,3 +1,9 @@
+# CS336 Spring 2025 Assignment 1: Basics - Dmitry's Solution
+
+This is my take on the assignment 1 of the Spring 2025 version of Stanford's [CS336: Language Modeling from Scratch](https://stanford-cs336.github.io/spring2025/).  I have thoroughly enjoyed doing the exercises - see my [writeup](./writeup.pdf).  Read it together with [the assignment handout](./cs336_spring2025_assignment1_basics.pdf).
+
+Below is the original README...
+
 # CS336 Spring 2025 Assignment 1: Basics
 
 For a full description of the assignment, see the assignment handout at
