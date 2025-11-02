@@ -554,6 +554,12 @@ would likely require a much longer training with a longer context and a larger m
 
 \subsection{Your own modification + leaderboard}
 
-Given resource limitations (I am not a Stanford student), I skipped this part.
+Given resource limitations (I am not a Stanford student), I skipped the OpenWebText leaderboard part.
+
+On TinyStories, I tried weight tying, namely forcing the embedding layer and the linear head to share weights.
+During weight initialization I used the middle value of $\sigma=\sqrt{\frac{1}{d_{\text{model}}}}$.
+As a result, the final validation loss decreased from 1.343 to 1.333 (\href{https://wandb.ai/dmitry-frumkin-personal/cs336-2025-a1/runs/tpwxroqr}{run}).
+
+In addition, I removed weight decay for the embedding layer (there was no reason for weight decay on embedding even without weight tying), which resulted in the final validation loss of 1.306 (\href{https://wandb.ai/dmitry-frumkin-personal/cs336-2025-a1/runs/1kg0ajvk}{run}).
 
 \end{document}
